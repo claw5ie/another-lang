@@ -9,11 +9,45 @@ struct LineInfo
 
 enum TokenTag
   {
+    Token_Or,
+    Token_And,
+    Token_Eq,
+    Token_Neq,
+    Token_Leq,
+    Token_Geq,
+    Token_Lt,
+    Token_Gt,
     Token_Add,
+    Token_Sub,
     Token_Mul,
+    Token_Div,
+    Token_Mod,
 
+    Token_Not,
     Token_Open_Paren,
     Token_Close_Paren,
+    Token_Open_Curly,
+    Token_Close_Curly,
+    Token_Open_Bracket,
+    Token_Close_Bracket,
+    Token_Semicolon,
+    Token_Dot,
+    Token_Comma,
+    Token_Equal,
+
+    Token_If,
+    Token_Then,
+    Token_Else,
+    Token_While,
+    Token_Do,
+    Token_Break,
+    Token_Continue,
+
+    Token_Void_Type,
+    Token_Bool_Type,
+
+    Token_False,
+    Token_True,
 
     Token_Integer,
     Token_Identifier,
@@ -78,9 +112,9 @@ buffer_token(Lexer *lexer)
 
   Token token = {
     .tag = Token_End_Of_File,
-      .text = { .data = &text[at], .count = 0 },
-      .line_info = lexer->line_info,
-      };
+    .text = { .data = &text[at], .count = 0 },
+    .line_info = lexer->line_info,
+  };
 
   if (text[at] == '\0')
     { }
@@ -107,6 +141,37 @@ buffer_token(Lexer *lexer)
 
       token.tag = Token_Identifier;
       token.text.count = at - token.line_info.offset;
+
+      typedef struct Keyword Keyword;
+      struct Keyword
+      {
+        StringView text;
+        TokenTag tag;
+      };
+
+      const Keyword keywords[] = {
+        { .text = STRING_VIEW_FROM_CSTRING("if"),       .tag = Token_If        },
+        { .text = STRING_VIEW_FROM_CSTRING("then"),     .tag = Token_Then      },
+        { .text = STRING_VIEW_FROM_CSTRING("else"),     .tag = Token_Else      },
+        { .text = STRING_VIEW_FROM_CSTRING("while"),    .tag = Token_While     },
+        { .text = STRING_VIEW_FROM_CSTRING("do"),       .tag = Token_Do        },
+        { .text = STRING_VIEW_FROM_CSTRING("break"),    .tag = Token_Break     },
+        { .text = STRING_VIEW_FROM_CSTRING("continue"), .tag = Token_Continue  },
+        { .text = STRING_VIEW_FROM_CSTRING("void"),     .tag = Token_Void_Type },
+        { .text = STRING_VIEW_FROM_CSTRING("bool"),     .tag = Token_Bool_Type },
+        { .text = STRING_VIEW_FROM_CSTRING("false"),    .tag = Token_False     },
+        { .text = STRING_VIEW_FROM_CSTRING("true"),     .tag = Token_True      },
+      };
+
+      for (size_t i = 0; i < ARRAY_COUNT(keywords); i++)
+        {
+          const Keyword *keyword = &keywords[i];
+          if (are_string_views_equal(keyword->text, token.text))
+            {
+              token.tag = keyword->tag;
+              break;
+            }
+        }
     }
   else
     {
@@ -118,10 +183,30 @@ buffer_token(Lexer *lexer)
       };
 
       const Symbol symbols[] = {
-        { .text = STRING_VIEW_FROM_CSTRING("+"), .tag = Token_Add },
-        { .text = STRING_VIEW_FROM_CSTRING("*"), .tag = Token_Mul },
-        { .text = STRING_VIEW_FROM_CSTRING("("), .tag = Token_Open_Paren },
-        { .text = STRING_VIEW_FROM_CSTRING(")"), .tag = Token_Close_Paren },
+        { .text = STRING_VIEW_FROM_CSTRING("||"), .tag = Token_Or            },
+        { .text = STRING_VIEW_FROM_CSTRING("&&"), .tag = Token_And           },
+        { .text = STRING_VIEW_FROM_CSTRING("=="), .tag = Token_Eq            },
+        { .text = STRING_VIEW_FROM_CSTRING("!="), .tag = Token_Neq           },
+        { .text = STRING_VIEW_FROM_CSTRING("<="), .tag = Token_Leq           },
+        { .text = STRING_VIEW_FROM_CSTRING(">="), .tag = Token_Geq           },
+        { .text = STRING_VIEW_FROM_CSTRING("<"),  .tag = Token_Lt            },
+        { .text = STRING_VIEW_FROM_CSTRING(">"),  .tag = Token_Gt            },
+        { .text = STRING_VIEW_FROM_CSTRING("+"),  .tag = Token_Add           },
+        { .text = STRING_VIEW_FROM_CSTRING("-"),  .tag = Token_Sub           },
+        { .text = STRING_VIEW_FROM_CSTRING("*"),  .tag = Token_Mul           },
+        { .text = STRING_VIEW_FROM_CSTRING("/"),  .tag = Token_Div           },
+        { .text = STRING_VIEW_FROM_CSTRING("%"),  .tag = Token_Mod           },
+        { .text = STRING_VIEW_FROM_CSTRING("!"),  .tag = Token_Not           },
+        { .text = STRING_VIEW_FROM_CSTRING("("),  .tag = Token_Open_Paren    },
+        { .text = STRING_VIEW_FROM_CSTRING(")"),  .tag = Token_Close_Paren   },
+        { .text = STRING_VIEW_FROM_CSTRING("{"),  .tag = Token_Open_Curly    },
+        { .text = STRING_VIEW_FROM_CSTRING("}"),  .tag = Token_Close_Curly   },
+        { .text = STRING_VIEW_FROM_CSTRING("["),  .tag = Token_Open_Bracket  },
+        { .text = STRING_VIEW_FROM_CSTRING("]"),  .tag = Token_Close_Bracket },
+        { .text = STRING_VIEW_FROM_CSTRING(";"),  .tag = Token_Semicolon     },
+        { .text = STRING_VIEW_FROM_CSTRING("."),  .tag = Token_Dot           },
+        { .text = STRING_VIEW_FROM_CSTRING(","),  .tag = Token_Comma         },
+        { .text = STRING_VIEW_FROM_CSTRING("="),  .tag = Token_Equal         },
       };
 
       StringView rest = { .data = &text[at], .count = lexer->source_code_size - at };
@@ -153,6 +238,54 @@ buffer_token(Lexer *lexer)
   size_t index = (lexer->token_start + lexer->token_count) % LOOKAHEAD;
   lexer->tokens[index] = token;
   ++lexer->token_count;
+}
+
+const char *
+token_tag_to_string(TokenTag tag)
+{
+  switch (tag)
+    {
+    case Token_Open_Paren:  return "'('";
+    case Token_Close_Paren: return "')'";
+    case Token_Semicolon:   return "';'";
+    case Token_Or:
+    case Token_And:
+    case Token_Eq:
+    case Token_Neq:
+    case Token_Leq:
+    case Token_Geq:
+    case Token_Lt:
+    case Token_Gt:
+    case Token_Add:
+    case Token_Sub:
+    case Token_Mul:
+    case Token_Div:
+    case Token_Mod:
+    case Token_Not:
+    case Token_Open_Curly:
+    case Token_Close_Curly:
+    case Token_Open_Bracket:
+    case Token_Close_Bracket:
+    case Token_Dot:
+    case Token_Comma:
+    case Token_Equal:
+    case Token_If:
+    case Token_Then:
+    case Token_Else:
+    case Token_While:
+    case Token_Do:
+    case Token_Break:
+    case Token_Continue:
+    case Token_Void_Type:
+    case Token_Bool_Type:
+    case Token_False:
+    case Token_True:
+    case Token_Integer:
+    case Token_Identifier:
+    case Token_End_Of_File: UNREACHABLE();
+    }
+
+  UNREACHABLE();
 }
 
 Token
@@ -198,4 +331,17 @@ void
 advance_token(Lexer *lexer)
 {
   advance_many_tokens(lexer, 1);
+}
+
+void
+expect_token(Lexer *lexer, TokenTag expected)
+{
+  if (peek_token(lexer) != expected)
+    {
+      Token token = grab_token(lexer);
+      PRINT_ERROR(lexer->filepath, token.line_info, "expected %s, but got '%.*s'", token_tag_to_string(expected), FORMAT_STRING_VIEW(token.text));
+      exit(EXIT_FAILURE);
+    }
+
+  advance_token(lexer);
 }

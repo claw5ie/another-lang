@@ -28,26 +28,17 @@ typedef int32_t i32;
 typedef int64_t i64;
 
 #include "utils.c"
+#include "notstd.c"
 #include "lexer.c"
+#include "ast.c"
+#include "parser.c"
+#include "transpiler.c"
 #include "debugging-stuff.c"
 
 int
 main(void)
 {
-  const char *filepath = "examples/debug";
-  size_t source_code_size = 0;
-  char *source_code = read_entire_file(filepath, &source_code_size);
-
-  Lexer lexer = {
-    .token_start = 0,
-    .token_count = 0,
-    .line_info = { .line = 1, .column = 1, .offset = 0 },
-    .source_code = source_code,
-    .source_code_size = source_code_size,
-    .filepath = filepath,
-  };
-
-  debug_print_all_tokens(&lexer);
-
+  Ast ast = parse("examples/debug");
+  transpile_to_c(&ast);
   return EXIT_SUCCESS;
 }

@@ -1,18 +1,5 @@
+#define UNREACHABLE() assert(false)
 #define ARRAY_COUNT(array) (sizeof(array) / sizeof(*array))
-#define STRING_VIEW_FROM_CSTRING(string) (StringView){ string, sizeof(string) - 1 }
-
-typedef struct StringView StringView;
-struct StringView
-{
-  const char *data;
-  size_t count;
-};
-
-bool
-is_prefix(StringView prefix, StringView rest)
-{
-  return prefix.count <= rest.count && memcmp(prefix.data, rest.data, prefix.count) == 0;
-}
 
 char *
 read_entire_file(const char *filepath, size_t *file_size)
