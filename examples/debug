@@ -6,3 +6,27 @@ hello;
 1 <= 2;
 (2+2)*2;
 2*(2+2);
+
+if 2 + 2 then
+  {
+    if 2 2;
+    2 = 2;
+  }
+else
+  {
+    4 * 4;
+  }
+
+while false do
+  {
+  }
+
+do
+ { }
+while true;
+
+a :: int = 42;
+a :: i32 = 42;
+a :: i42 = 42;
+a = 69;
+b := false;

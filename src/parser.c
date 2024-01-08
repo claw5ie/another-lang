@@ -86,7 +86,7 @@ parse_highest_prec(Parser *p)
       return expr;
     }
 
-  AstExpr *expr = parser_malloc(p, sizeof(AstExpr));
+  AstExpr *expr = parser_malloc(p, sizeof(*expr));
   expr->line_info = token.line_info;
 
   switch (token.tag)
@@ -100,6 +100,56 @@ parse_highest_prec(Parser *p)
           .tag = to_unary_op_tag(token.tag),
           .subexpr = subexpr,
         };
+        return expr;
+      }
+    case Token_Void_Type:
+      {
+        AstType *type = parser_malloc(p, sizeof(*type));
+        *type = (AstType){
+          .tag = Ast_Type_Void,
+          .line_info = token.line_info,
+        };
+
+        expr->tag = Ast_Expr_Type;
+        expr->as.Type = type;
+
+        return expr;
+      }
+    case Token_Bool_Type:
+      {
+        AstType *type = parser_malloc(p, sizeof(*type));
+        *type = (AstType){
+          .tag = Ast_Type_Bool,
+          .line_info = token.line_info,
+        };
+
+        expr->tag = Ast_Expr_Type;
+        expr->as.Type = type;
+
+        return expr;
+      }
+    case Token_Int_Type:
+      {
+        StringView text = token.text;
+
+        u16 bits = 0;
+
+        for (size_t i = 1; i < text.count; i++)
+          bits = 10 * bits + (text.data[i] - '0');
+
+        AstType *type = parser_malloc(p, sizeof(*type));
+        *type = (AstType){
+          .tag = Ast_Type_Int,
+          .as = { .Int = {
+              .bits = bits,
+              .is_signed = text.data[0] == 'i',
+            } },
+          .line_info = token.line_info,
+        };
+
+        expr->tag = Ast_Expr_Type;
+        expr->as.Type = type;
+
         return expr;
       }
     case Token_False:
@@ -151,7 +201,7 @@ parse_prec(Parser *p, int min_prec)
           advance_token(&p->lexer);
 
           AstExpr *rhs = parse_prec(p, curr_prec + 1);
-          AstExpr *new_lhs = parser_malloc(p, sizeof(AstExpr));
+          AstExpr *new_lhs = parser_malloc(p, sizeof(*new_lhs));
           *new_lhs = (AstExpr){
             .tag = Ast_Expr_Binary_Op,
             .as = { .Binary_Op = {
@@ -180,6 +230,272 @@ parse_expr(Parser *p)
   return parse_prec(p, LOWEST_PREC);
 }
 
+// Kindof leaking memory. Expression that is passed will no longer be referenced and can't be reused from arena.
+AstType *
+parse_type(Parser *p)
+{
+  AstExpr *expr = parse_expr(p);
+  switch (expr->tag)
+    {
+    case Ast_Expr_Type:
+      return expr->as.Type;
+    case Ast_Expr_Identifier:
+      {
+        AstType *type = parser_malloc(p, sizeof(*type));
+        *type = (AstType){
+          .tag = Ast_Type_Identifier,
+          .as = { .Identifier = expr->as.Identifier },
+          .line_info = expr->line_info,
+        };
+        return type;
+      }
+    default:
+      {
+        PRINT_ERROR0(p->lexer.filepath, expr->line_info, "expression doesn't look like a type");
+        exit(EXIT_FAILURE);
+      }
+    }
+}
+
+AstSymbol *
+parse_symbol(Parser *p)
+{
+  if (peek_token(&p->lexer) == Token_Identifier)
+    {
+      switch (peek_ahead_token(&p->lexer, 1))
+        {
+        case Token_Double_Colon:
+          {
+            Token id_token = grab_token(&p->lexer);
+            advance_many_tokens(&p->lexer, 2);
+
+            AstType *type = parse_type(p);
+            AstExpr *expr = NULL;
+            if (peek_token(&p->lexer) == Token_Equal)
+              {
+                advance_token(&p->lexer);
+                expr = parse_expr(p);
+              }
+            AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+            *symbol = (AstSymbol){
+              .tag = Ast_Symbol_Variable,
+              .as = { .Variable = {
+                  .type = type,
+                  .expr = expr,
+                } },
+              .name = id_token.text,
+              .line_info = id_token.line_info,
+            };
+
+            expect_token(&p->lexer, Token_Semicolon);
+
+            return symbol;
+          }
+        case Token_Colon_Equal:
+          {
+            Token id_token = grab_token(&p->lexer);
+            advance_many_tokens(&p->lexer, 2);
+
+            AstExpr *expr = parse_expr(p);
+            AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+            *symbol = (AstSymbol){
+              .tag = Ast_Symbol_Variable,
+              .as = { .Variable = {
+                  .type = NULL,
+                  .expr = expr,
+                } },
+              .name = id_token.text,
+              .line_info = id_token.line_info,
+            };
+
+            expect_token(&p->lexer, Token_Semicolon);
+
+            return symbol;
+          }
+        default:
+          return NULL;
+        }
+    }
+
+  return NULL;
+}
+
+AstStmtBlock parse_stmt_block(Parser *);
+AstStmtBlock parse_single_stmt_or_block(Parser *);
+
+AstStmt
+parse_stmt(Parser *p)
+{
+  AstStmt stmt;
+  stmt.line_info = grab_token(&p->lexer).line_info;
+
+  switch (peek_token(&p->lexer))
+    {
+    case Token_Open_Curly:
+      {
+        AstStmtBlock block = parse_stmt_block(p);
+        stmt.tag = Ast_Stmt_Block;
+        stmt.as.Block = block;
+
+        return stmt;
+      }
+    case Token_If:
+      {
+        advance_token(&p->lexer);
+
+        AstExpr *expr = parse_expr(p);
+        if (peek_token(&p->lexer) == Token_Then)
+          advance_token(&p->lexer);
+        AstStmtBlock if_true = parse_single_stmt_or_block(p);
+        AstStmtBlock if_false = { 0 };
+        if (peek_token(&p->lexer) == Token_Else)
+          {
+            advance_token(&p->lexer);
+            if_false = parse_single_stmt_or_block(p);
+          }
+
+        stmt.tag = Ast_Stmt_If;
+        stmt.as.If = (AstStmtIf){
+          .cond = expr,
+          .if_true = if_true,
+          .if_false = if_false,
+        };
+
+        return stmt;
+      }
+    case Token_While:
+      {
+        advance_token(&p->lexer);
+
+        AstExpr *expr = parse_expr(p);
+        if (peek_token(&p->lexer) == Token_Do)
+          advance_token(&p->lexer);
+        AstStmtBlock block = parse_single_stmt_or_block(p);
+
+        stmt.tag = Ast_Stmt_While;
+        stmt.as.While = (AstStmtWhile){
+          .cond = expr,
+          .block = block,
+          .is_do_while = false,
+        };
+
+        return stmt;
+      }
+    case Token_Do:
+      {
+        advance_token(&p->lexer);
+
+        AstStmtBlock block = parse_single_stmt_or_block(p);
+        expect_token(&p->lexer, Token_While);
+        AstExpr *expr = parse_expr(p);
+        expect_token(&p->lexer, Token_Semicolon);
+
+        stmt.tag = Ast_Stmt_While;
+        stmt.as.While = (AstStmtWhile){
+          .cond = expr,
+          .block = block,
+          .is_do_while = true,
+        };
+
+        return stmt;
+      }
+    case Token_Break:
+      advance_token(&p->lexer);
+      expect_token(&p->lexer, Token_Semicolon);
+      stmt.tag = Ast_Stmt_Break;
+      return stmt;
+    case Token_Continue:
+      advance_token(&p->lexer);
+      expect_token(&p->lexer, Token_Semicolon);
+      stmt.tag = Ast_Stmt_Continue;
+      return stmt;
+    case Token_Identifier:
+      {
+        AstSymbol *symbol = parse_symbol(p);
+        if (symbol != NULL)
+          {
+            stmt.tag = Ast_Stmt_Symbol;
+            stmt.as.Symbol = symbol;
+            return stmt;
+          }
+      }
+      // fall through
+    default:
+      {
+        AstExpr *lhs = parse_expr(p);
+
+        if (peek_token(&p->lexer) == Token_Equal)
+          {
+            advance_token(&p->lexer);
+            AstExpr *rhs = parse_expr(p);
+            expect_token(&p->lexer, Token_Semicolon);
+
+            stmt.tag = Ast_Stmt_Assign;
+            stmt.as.Assign = (AstStmtAssign){
+              .lhs = lhs,
+              .rhs = rhs,
+            };
+
+            return stmt;
+          }
+
+        expect_token(&p->lexer, Token_Semicolon);
+
+        stmt.tag = Ast_Stmt_Expr;
+        stmt.as.Expr = lhs;
+
+        return stmt;
+      }
+    }
+}
+
+AstStmtBlock
+parse_stmt_block(Parser *p)
+{
+  expect_token(&p->lexer, Token_Open_Curly);
+
+  AstStmtBlock block = { 0 };
+
+  TokenTag tt = peek_token(&p->lexer);
+  while (tt != Token_End_Of_File && tt != Token_Close_Curly)
+    {
+      AstStmt *stmt = parser_malloc(p, sizeof(*stmt));
+      *stmt = parse_stmt(p);
+
+      LinkedListNode *node = parser_malloc(p, sizeof(*node));
+      node->data = stmt;
+      linked_list_insert_last(&block, node);
+
+      tt = peek_token(&p->lexer);
+    }
+
+  expect_token(&p->lexer, Token_Close_Curly);
+
+  return block;
+}
+
+AstStmtBlock
+parse_single_stmt_or_block(Parser *p)
+{
+  switch (peek_token(&p->lexer))
+    {
+    case Token_Open_Curly:
+      return parse_stmt_block(p);
+    default:
+      {
+        AstStmt *stmt = parser_malloc(p, sizeof(*stmt));
+        *stmt = parse_stmt(p);
+
+        AstStmtBlock block = { 0 };
+        LinkedListNode *node = parser_malloc(p, sizeof(*node));
+        node->data = stmt;
+        linked_list_insert_last(&block, node);
+
+        return block;
+      }
+    }
+}
+
 Ast
 parse(const char *filepath)
 {
@@ -198,19 +514,20 @@ parse(const char *filepath)
     .arena = { 0 },
   };
 
-  LinkedList exprs = { 0 };
+  LinkedList stmts = { 0 };
 
   while (peek_token(&parser.lexer) != Token_End_Of_File)
     {
-      AstExpr *expr = parse_expr(&parser);
-      LinkedListNode *node = parser_malloc(&parser, sizeof(LinkedListNode));
-      node->data = expr;
-      linked_list_insert_last(&exprs, node);
-      expect_token(&parser.lexer, Token_Semicolon);
+      AstStmt *stmt = parser_malloc(&parser, sizeof(*stmt));
+      *stmt = parse_stmt(&parser);
+
+      LinkedListNode *node = parser_malloc(&parser, sizeof(*node));
+      node->data = stmt;
+      linked_list_insert_last(&stmts, node);
     }
 
   Ast ast = {
-    .exprs = exprs,
+    .stmts = stmts,
     .arena = parser.arena,
   };
 

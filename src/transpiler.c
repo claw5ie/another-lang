@@ -1,4 +1,14 @@
+#define TAB_SPACE 2
 #define PUTS(string) fputs(string, stdout)
+
+void
+put_spaces(size_t count)
+{
+  while (count-- > 0)
+    PUTS(" ");
+}
+
+void transpile_to_c_type(AstType *);
 
 void
 transpile_to_c_expr(AstExpr *expr)
@@ -63,6 +73,14 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
+    case Ast_Expr_Type:
+      {
+        AstType *Type = expr->as.Type;
+
+        transpile_to_c_type(Type);
+      }
+
+      break;
     case Ast_Expr_Identifier:
       {
         StringView Identifier = expr->as.Identifier;
@@ -75,12 +93,181 @@ transpile_to_c_expr(AstExpr *expr)
 }
 
 void
+transpile_to_c_type(AstType *type)
+{
+  switch (type->tag)
+    {
+    case Ast_Type_Void:       PUTS("void"); break;
+    case Ast_Type_Bool:       PUTS("bool"); break;
+    case Ast_Type_Int:
+      {
+        AstTypeInt *Int = &type->as.Int;
+
+        printf("%c%i", Int->is_signed ? 'i' : 'u', Int->bits);
+      }
+
+      break;
+    case Ast_Type_Identifier:
+      {
+        StringView Identifier = type->as.Identifier;
+
+        printf("%.*s", FORMAT_STRING_VIEW(Identifier));
+      }
+
+      break;
+    }
+}
+
+void
+transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
+{
+  switch (symbol->tag)
+    {
+    case Ast_Symbol_Variable:
+      {
+        AstSymbolVariable *Variable = &symbol->as.Variable;
+
+        put_spaces(ident);
+
+        switch (((Variable->expr != NULL) << 1) | (Variable->type != NULL))
+          {
+          case 1: // 0b01
+            {
+              transpile_to_c_type(Variable->type);
+              PUTS(" ");
+              printf("%.*s;", FORMAT_STRING_VIEW(symbol->name));
+            }
+
+            break;
+          case 2: // 0b10
+            {
+              printf("auto %.*s = ", FORMAT_STRING_VIEW(symbol->name));
+              transpile_to_c_expr(Variable->expr);
+              PUTS(";");
+            }
+
+            break;
+          case 3: // 0b11
+            {
+              transpile_to_c_type(Variable->type);
+              PUTS(" ");
+              printf("%.*s = ", FORMAT_STRING_VIEW(symbol->name));
+              transpile_to_c_expr(Variable->expr);
+              PUTS(";");
+            }
+
+            break;
+          default: UNREACHABLE();
+          }
+      }
+
+      break;
+    }
+}
+
+void transpile_to_c_stmt_block(AstStmtBlock, size_t);
+
+void
+transpile_to_c_stmt(AstStmt *stmt, size_t ident)
+{
+  switch (stmt->tag)
+    {
+    case Ast_Stmt_Block:
+      transpile_to_c_stmt_block(stmt->as.Block, ident);
+      break;
+    case Ast_Stmt_If:
+      {
+        AstStmtIf *If = &stmt->as.If;
+
+        put_spaces(ident);
+        PUTS("if (");
+        transpile_to_c_expr(If->cond);
+        PUTS(")\n");
+        transpile_to_c_stmt_block(If->if_true, ident + TAB_SPACE);
+        put_spaces(ident);
+        PUTS("else\n");
+        transpile_to_c_stmt_block(If->if_false, ident + TAB_SPACE);
+      }
+
+      break;
+    case Ast_Stmt_While:
+      {
+        AstStmtWhile *While = &stmt->as.While;
+
+        if (While->is_do_while)
+          {
+            put_spaces(ident);
+            PUTS("do\n");
+            transpile_to_c_stmt_block(While->block, ident + TAB_SPACE);
+            put_spaces(ident);
+            PUTS("while (");
+            transpile_to_c_expr(While->cond);
+            PUTS(");\n");
+          }
+        else
+          {
+            put_spaces(ident);
+            PUTS("while (");
+            transpile_to_c_expr(While->cond);
+            PUTS(")\n");
+            transpile_to_c_stmt_block(While->block, ident + TAB_SPACE);
+          }
+      }
+
+      break;
+    case Ast_Stmt_Break:
+      put_spaces(ident);
+      PUTS("break;");
+      break;
+    case Ast_Stmt_Continue:
+      put_spaces(ident);
+      PUTS("continue;");
+      break;
+    case Ast_Stmt_Assign:
+      {
+        AstStmtAssign *Assign = &stmt->as.Assign;
+
+        put_spaces(ident);
+        transpile_to_c_expr(Assign->lhs);
+        PUTS(" = ");
+        transpile_to_c_expr(Assign->rhs);
+        PUTS(";");
+      }
+
+      break;
+    case Ast_Stmt_Symbol:
+      transpile_to_c_symbol(stmt->as.Symbol, ident);
+      break;
+    case Ast_Stmt_Expr:
+      put_spaces(ident);
+      transpile_to_c_expr(stmt->as.Expr);
+      PUTS(";");
+      break;
+    }
+}
+
+void
+transpile_to_c_stmt_block(AstStmtBlock block, size_t ident)
+{
+  put_spaces(ident);
+  PUTS("{\n");
+  for (LinkedListNode *node = block.first; node != NULL; node = node->next)
+    {
+      AstStmt *stmt = node->data;
+      transpile_to_c_stmt(stmt, ident + TAB_SPACE);
+      PUTS("\n");
+    }
+  put_spaces(ident);
+  PUTS("}\n");
+}
+
+void
 transpile_to_c(Ast *ast)
 {
-  for (LinkedListNode *node = ast->exprs.first; node != NULL; node = node->next)
+  for (LinkedListNode *node = ast->stmts.first; node != NULL; node = node->next)
     {
-      AstExpr *expr = node->data;
-      transpile_to_c_expr(expr);
-      PUTS(";\n");
+      AstStmt *stmt = node->data;
+      transpile_to_c_stmt(stmt, 0);
+      PUTS("\n");
     }
 }

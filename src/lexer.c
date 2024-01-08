@@ -34,6 +34,8 @@ enum TokenTag
     Token_Dot,
     Token_Comma,
     Token_Equal,
+    Token_Double_Colon,
+    Token_Colon_Equal,
 
     Token_If,
     Token_Then,
@@ -45,6 +47,7 @@ enum TokenTag
 
     Token_Void_Type,
     Token_Bool_Type,
+    Token_Int_Type,
 
     Token_False,
     Token_True,
@@ -78,6 +81,15 @@ struct Lexer
   size_t source_code_size;
   const char *filepath;
 };
+
+bool
+is_int_type(StringView text)
+{
+  return text.count >= 2 && text.count <= 3
+    && (text.data[0] == 'i' || text.data[0] == 'u')
+    && isdigit(text.data[1])
+    && isdigit(text.data[2]);
+}
 
 void
 advance_line_info(Lexer *lexer)
@@ -142,6 +154,12 @@ buffer_token(Lexer *lexer)
       token.tag = Token_Identifier;
       token.text.count = at - token.line_info.offset;
 
+      if (is_int_type(token.text))
+        {
+          token.tag = Token_Int_Type;
+          goto push_token;
+        }
+
       typedef struct Keyword Keyword;
       struct Keyword
       {
@@ -189,6 +207,8 @@ buffer_token(Lexer *lexer)
         { .text = STRING_VIEW_FROM_CSTRING("!="), .tag = Token_Neq           },
         { .text = STRING_VIEW_FROM_CSTRING("<="), .tag = Token_Leq           },
         { .text = STRING_VIEW_FROM_CSTRING(">="), .tag = Token_Geq           },
+        { .text = STRING_VIEW_FROM_CSTRING("::"), .tag = Token_Double_Colon  },
+        { .text = STRING_VIEW_FROM_CSTRING(":="), .tag = Token_Colon_Equal   },
         { .text = STRING_VIEW_FROM_CSTRING("<"),  .tag = Token_Lt            },
         { .text = STRING_VIEW_FROM_CSTRING(">"),  .tag = Token_Gt            },
         { .text = STRING_VIEW_FROM_CSTRING("+"),  .tag = Token_Add           },
@@ -269,6 +289,8 @@ token_tag_to_string(TokenTag tag)
     case Token_Dot:
     case Token_Comma:
     case Token_Equal:
+    case Token_Double_Colon:
+    case Token_Colon_Equal:
     case Token_If:
     case Token_Then:
     case Token_Else:
@@ -278,6 +300,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Continue:
     case Token_Void_Type:
     case Token_Bool_Type:
+    case Token_Int_Type:
     case Token_False:
     case Token_True:
     case Token_Integer:

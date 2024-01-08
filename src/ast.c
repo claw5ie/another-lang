@@ -1,11 +1,40 @@
 typedef struct Ast Ast;
 struct Ast
 {
-  LinkedList exprs;
+  LinkedList stmts;
   Arena arena;
 };
 
 typedef struct AstExpr AstExpr;
+typedef struct AstType AstType;
+
+typedef struct AstSymbolVariable AstSymbolVariable;
+struct AstSymbolVariable
+{
+  AstType *type;
+  AstExpr *expr;
+};
+
+typedef union AstSymbolData AstSymbolData;
+union AstSymbolData
+{
+  AstSymbolVariable Variable;
+};
+
+enum AstSymbolTag
+  {
+    Ast_Symbol_Variable,
+  };
+typedef enum AstSymbolTag AstSymbolTag;
+
+typedef struct AstSymbol AstSymbol;
+struct AstSymbol
+{
+  AstSymbolTag tag;
+  AstSymbolData as;
+  StringView name;
+  LineInfo line_info;
+};
 
 enum AstExprBinaryOpTag
   {
@@ -53,6 +82,7 @@ union AstExprData
   AstExprUnaryOp Unary_Op;
   u64 Int64;
   bool Bool;
+  AstType *Type;
   StringView Identifier;
 };
 
@@ -62,6 +92,7 @@ enum AstExprTag
     Ast_Expr_Unary_Op,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
+    Ast_Expr_Type,
     Ast_Expr_Identifier,
   };
 typedef enum AstExprTag AstExprTag;
@@ -70,5 +101,91 @@ struct AstExpr
 {
   AstExprTag tag;
   AstExprData as;
+  LineInfo line_info;
+};
+
+typedef LinkedList AstStmtBlock;
+
+typedef struct AstStmtIf AstStmtIf;
+struct AstStmtIf
+{
+  AstExpr *cond;
+  AstStmtBlock if_true, if_false;
+};
+
+typedef struct AstStmtWhile AstStmtWhile;
+struct AstStmtWhile
+{
+  AstExpr *cond;
+  AstStmtBlock block;
+  bool is_do_while;
+};
+
+typedef struct AstStmtAssign AstStmtAssign;
+struct AstStmtAssign
+{
+  AstExpr *lhs, *rhs;
+};
+
+typedef union AstStmtData AstStmtData;
+union AstStmtData
+{
+  AstStmtBlock Block;
+  AstStmtIf If;
+  AstStmtWhile While;
+  AstStmtAssign Assign;
+  AstSymbol *Symbol;
+  AstExpr *Expr;
+};
+
+enum AstStmtTag
+  {
+    Ast_Stmt_Block,
+    Ast_Stmt_If,
+    Ast_Stmt_While,
+    Ast_Stmt_Break,
+    Ast_Stmt_Continue,
+    Ast_Stmt_Assign,
+    Ast_Stmt_Symbol,
+    Ast_Stmt_Expr,
+  };
+typedef enum AstStmtTag AstStmtTag;
+
+typedef struct AstStmt AstStmt;
+struct AstStmt
+{
+  AstStmtTag tag;
+  AstStmtData as;
+  LineInfo line_info;
+};
+
+typedef struct AstTypeInt AstTypeInt;
+struct AstTypeInt
+{
+  u16 bits;
+  bool is_signed;
+};
+
+typedef union AstTypeData AstTypeData;
+union AstTypeData
+{
+  AstTypeInt Int;
+  StringView Identifier;
+};
+
+enum AstTypeTag
+  {
+    Ast_Type_Void,
+    Ast_Type_Bool,
+    Ast_Type_Int,
+    Ast_Type_Identifier,
+  };
+typedef enum AstTypeTag AstTypeTag;
+
+typedef struct AstType AstType;
+struct AstType
+{
+  AstTypeTag tag;
+  AstTypeData as;
   LineInfo line_info;
 };

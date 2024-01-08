@@ -27,6 +27,8 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Dot:           return "Dot";
     case Token_Comma:         return "Comma";
     case Token_Equal:         return "Equal";
+    case Token_Double_Colon:  return "Double_Colon";
+    case Token_Colon_Equal:   return "Colon_Equal";
     case Token_If:            return "If";
     case Token_Then:          return "Then";
     case Token_Else:          return "Else";
@@ -36,6 +38,7 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Continue:      return "Continue";
     case Token_Void_Type:     return "Void_Type";
     case Token_Bool_Type:     return "Bool_Type";
+    case Token_Int_Type:      return "Int_Type";
     case Token_False:         return "False";
     case Token_True:          return "True";
     case Token_Integer:       return "Integer";
