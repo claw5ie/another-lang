@@ -17,6 +17,7 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Div:           return "Div";
     case Token_Mod:           return "Mod";
     case Token_Not:           return "Not";
+    case Token_Ref:           return "Ref";
     case Token_Open_Paren:    return "Open_Paren";
     case Token_Close_Paren:   return "Close_Paren";
     case Token_Open_Curly:    return "Open_Curly";

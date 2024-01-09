@@ -48,12 +48,53 @@ transpile_to_c_expr(AstExpr *expr)
 
         switch (Unary_Op->tag)
           {
-          case Ast_Expr_Unary_Op_Neg: PUTS("-"); break;
-          case Ast_Expr_Unary_Op_Not: PUTS("!"); break;
+          case Ast_Expr_Unary_Op_Neg:
+            {
+              PUTS("-(");
+              transpile_to_c_expr(Unary_Op->subexpr);
+              PUTS(")");
+            }
+
+            break;
+          case Ast_Expr_Unary_Op_Not:
+            {
+              PUTS("!(");
+              transpile_to_c_expr(Unary_Op->subexpr);
+              PUTS(")");
+            }
+
+            break;
+          case Ast_Expr_Unary_Op_Ref:
+            {
+              PUTS("&(");
+              transpile_to_c_expr(Unary_Op->subexpr);
+              PUTS(")");
+            }
+
+            break;
+          case Ast_Expr_Unary_Op_Deref:
+            {
+              PUTS("(");
+              transpile_to_c_expr(Unary_Op->subexpr);
+              PUTS(")*");
+            }
+
+            break;
           }
-        PUTS("(");
-        transpile_to_c_expr(Unary_Op->subexpr);
-        PUTS(")");
+      }
+
+      break;
+    case Ast_Expr_Type_Void:
+      PUTS("void");
+      break;
+    case Ast_Expr_Type_Bool:
+      PUTS("bool");
+      break;
+    case Ast_Expr_Type_Int:
+      {
+        AstExprTypeInt *Type_Int = &expr->as.Type_Int;
+
+        printf("%c%i", Type_Int->is_signed ? 'i' : 'u', Type_Int->bits);
       }
 
       break;
@@ -73,14 +114,6 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
-    case Ast_Expr_Type:
-      {
-        AstType *Type = expr->as.Type;
-
-        transpile_to_c_type(Type);
-      }
-
-      break;
     case Ast_Expr_Identifier:
       {
         StringView Identifier = expr->as.Identifier;
@@ -95,27 +128,7 @@ transpile_to_c_expr(AstExpr *expr)
 void
 transpile_to_c_type(AstType *type)
 {
-  switch (type->tag)
-    {
-    case Ast_Type_Void:       PUTS("void"); break;
-    case Ast_Type_Bool:       PUTS("bool"); break;
-    case Ast_Type_Int:
-      {
-        AstTypeInt *Int = &type->as.Int;
-
-        printf("%c%i", Int->is_signed ? 'i' : 'u', Int->bits);
-      }
-
-      break;
-    case Ast_Type_Identifier:
-      {
-        StringView Identifier = type->as.Identifier;
-
-        printf("%.*s", FORMAT_STRING_VIEW(Identifier));
-      }
-
-      break;
-    }
+  transpile_to_c_expr(type);
 }
 
 void

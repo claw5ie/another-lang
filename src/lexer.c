@@ -24,6 +24,7 @@ enum TokenTag
     Token_Mod,
 
     Token_Not,
+    Token_Ref,
     Token_Open_Paren,
     Token_Close_Paren,
     Token_Open_Curly,
@@ -217,6 +218,7 @@ buffer_token(Lexer *lexer)
         { .text = STRING_VIEW_FROM_CSTRING("/"),  .tag = Token_Div           },
         { .text = STRING_VIEW_FROM_CSTRING("%"),  .tag = Token_Mod           },
         { .text = STRING_VIEW_FROM_CSTRING("!"),  .tag = Token_Not           },
+        { .text = STRING_VIEW_FROM_CSTRING("&"),  .tag = Token_Ref           },
         { .text = STRING_VIEW_FROM_CSTRING("("),  .tag = Token_Open_Paren    },
         { .text = STRING_VIEW_FROM_CSTRING(")"),  .tag = Token_Close_Paren   },
         { .text = STRING_VIEW_FROM_CSTRING("{"),  .tag = Token_Open_Curly    },
@@ -282,6 +284,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Div:
     case Token_Mod:
     case Token_Not:
+    case Token_Ref:
     case Token_Open_Curly:
     case Token_Close_Curly:
     case Token_Open_Bracket:

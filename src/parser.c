@@ -67,14 +67,37 @@ to_unary_op_tag(TokenTag op)
     {
     case Token_Sub: return Ast_Expr_Unary_Op_Neg;
     case Token_Not: return Ast_Expr_Unary_Op_Not;
+    case Token_Ref: return Ast_Expr_Unary_Op_Ref;
     default:        assert(false);
     }
 }
 
 AstExpr *parse_expr(Parser *);
 
+// Cases here and in "parse_highest_prec_base" should match one to one. Don't forget to keep them in sync!!
+bool
+can_token_start_expression(TokenTag tag)
+{
+  switch (tag)
+    {
+    case Token_Open_Paren:
+    case Token_And:
+    case Token_Sub:
+    case Token_Not:
+    case Token_Ref:
+    case Token_Void_Type:
+    case Token_Bool_Type:
+    case Token_Int_Type:
+    case Token_False:
+    case Token_True:
+    case Token_Integer:
+    case Token_Identifier: return true;
+    default:               return false;
+    }
+}
+
 AstExpr *
-parse_highest_prec(Parser *p)
+parse_highest_prec_base(Parser *p)
 {
   Token token = grab_token(&p->lexer);
   advance_token(&p->lexer);
@@ -91,10 +114,31 @@ parse_highest_prec(Parser *p)
 
   switch (token.tag)
     {
+    case Token_And: // Double reference (as in '&&expr').
+      {
+        AstExpr *subsubexpr = parse_highest_prec_base(p);
+        AstExpr *subexpr = parser_malloc(p, sizeof(*subexpr));
+        *subexpr = (AstExpr){
+          .tag = Ast_Expr_Unary_Op,
+          .as = { .Unary_Op = {
+              .tag = Ast_Expr_Unary_Op_Ref,
+              .subexpr = subsubexpr,
+            } },
+          .line_info = token.line_info,
+        };
+        expr->tag = Ast_Expr_Unary_Op;
+        expr->as.Unary_Op = (AstExprUnaryOp){
+          .tag = Ast_Expr_Unary_Op_Ref,
+          .subexpr = subexpr,
+        };
+
+        return expr;
+      }
     case Token_Sub:
     case Token_Not:
+    case Token_Ref:
       {
-        AstExpr *subexpr = parse_highest_prec(p);
+        AstExpr *subexpr = parse_highest_prec_base(p);
         expr->tag = Ast_Expr_Unary_Op;
         expr->as.Unary_Op = (AstExprUnaryOp){
           .tag = to_unary_op_tag(token.tag),
@@ -104,51 +148,27 @@ parse_highest_prec(Parser *p)
       }
     case Token_Void_Type:
       {
-        AstType *type = parser_malloc(p, sizeof(*type));
-        *type = (AstType){
-          .tag = Ast_Type_Void,
-          .line_info = token.line_info,
-        };
-
-        expr->tag = Ast_Expr_Type;
-        expr->as.Type = type;
-
+        expr->tag = Ast_Expr_Type_Void;
         return expr;
       }
     case Token_Bool_Type:
       {
-        AstType *type = parser_malloc(p, sizeof(*type));
-        *type = (AstType){
-          .tag = Ast_Type_Bool,
-          .line_info = token.line_info,
-        };
-
-        expr->tag = Ast_Expr_Type;
-        expr->as.Type = type;
-
+        expr->tag = Ast_Expr_Type_Bool;
         return expr;
       }
     case Token_Int_Type:
       {
-        StringView text = token.text;
-
         u16 bits = 0;
 
+        StringView text = token.text;
         for (size_t i = 1; i < text.count; i++)
           bits = 10 * bits + (text.data[i] - '0');
 
-        AstType *type = parser_malloc(p, sizeof(*type));
-        *type = (AstType){
-          .tag = Ast_Type_Int,
-          .as = { .Int = {
-              .bits = bits,
-              .is_signed = text.data[0] == 'i',
-            } },
-          .line_info = token.line_info,
+        expr->tag = Ast_Expr_Type_Int;
+        expr->as.Type_Int = (AstExprTypeInt){
+          .bits = bits,
+          .is_signed = text.data[0] == 'i',
         };
-
-        expr->tag = Ast_Expr_Type;
-        expr->as.Type = type;
 
         return expr;
       }
@@ -184,6 +204,46 @@ parse_highest_prec(Parser *p)
         exit(EXIT_FAILURE);
       }
     }
+}
+
+AstExpr *
+parse_highest_prec(Parser *p)
+{
+  AstExpr *base = parse_highest_prec_base(p);
+
+  do
+    {
+      switch (peek_token(&p->lexer))
+        {
+        case Token_Mul:
+          {
+            TokenTag next = peek_ahead_token(&p->lexer, 1);
+            if (can_token_start_expression(next))
+              goto finish_parsing_postfix_unary_operators;
+
+            LineInfo line_info = grab_token(&p->lexer).line_info;
+            advance_token(&p->lexer);
+            AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
+            *new_base = (AstExpr){
+              .tag = Ast_Expr_Unary_Op,
+              .as = { .Unary_Op = {
+                  .tag = Ast_Expr_Unary_Op_Deref,
+                  .subexpr = base,
+                } },
+              .line_info = line_info,
+            };
+            base = new_base;
+          }
+
+          break;
+        default:
+          goto finish_parsing_postfix_unary_operators;
+        }
+    }
+  while (true);
+ finish_parsing_postfix_unary_operators:
+
+  return base;
 }
 
 AstExpr *
@@ -230,31 +290,10 @@ parse_expr(Parser *p)
   return parse_prec(p, LOWEST_PREC);
 }
 
-// Kindof leaking memory. Expression that is passed will no longer be referenced and can't be reused from arena.
 AstType *
 parse_type(Parser *p)
 {
-  AstExpr *expr = parse_expr(p);
-  switch (expr->tag)
-    {
-    case Ast_Expr_Type:
-      return expr->as.Type;
-    case Ast_Expr_Identifier:
-      {
-        AstType *type = parser_malloc(p, sizeof(*type));
-        *type = (AstType){
-          .tag = Ast_Type_Identifier,
-          .as = { .Identifier = expr->as.Identifier },
-          .line_info = expr->line_info,
-        };
-        return type;
-      }
-    default:
-      {
-        PRINT_ERROR0(p->lexer.filepath, expr->line_info, "expression doesn't look like a type");
-        exit(EXIT_FAILURE);
-      }
-    }
+  return parse_expr(p);
 }
 
 AstSymbol *

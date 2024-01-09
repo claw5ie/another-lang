@@ -6,7 +6,7 @@ struct Ast
 };
 
 typedef struct AstExpr AstExpr;
-typedef struct AstType AstType;
+typedef AstExpr AstType;
 
 typedef struct AstSymbolVariable AstSymbolVariable;
 struct AstSymbolVariable
@@ -65,6 +65,8 @@ enum AstExprUnaryOpTag
   {
     Ast_Expr_Unary_Op_Neg,
     Ast_Expr_Unary_Op_Not,
+    Ast_Expr_Unary_Op_Ref,
+    Ast_Expr_Unary_Op_Deref,
   };
 typedef enum AstExprUnaryOpTag AstExprUnaryOpTag;
 
@@ -75,6 +77,13 @@ struct AstExprUnaryOp
   AstExpr *subexpr;
 };
 
+typedef struct AstExprTypeInt AstExprTypeInt;
+struct AstExprTypeInt
+{
+  u16 bits;
+  bool is_signed;
+};
+
 typedef union AstExprData AstExprData;
 union AstExprData
 {
@@ -82,7 +91,7 @@ union AstExprData
   AstExprUnaryOp Unary_Op;
   u64 Int64;
   bool Bool;
-  AstType *Type;
+  AstExprTypeInt Type_Int;
   StringView Identifier;
 };
 
@@ -90,9 +99,11 @@ enum AstExprTag
   {
     Ast_Expr_Binary_Op,
     Ast_Expr_Unary_Op,
+    Ast_Expr_Type_Void,
+    Ast_Expr_Type_Bool,
+    Ast_Expr_Type_Int,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
-    Ast_Expr_Type,
     Ast_Expr_Identifier,
   };
 typedef enum AstExprTag AstExprTag;
@@ -156,36 +167,5 @@ struct AstStmt
 {
   AstStmtTag tag;
   AstStmtData as;
-  LineInfo line_info;
-};
-
-typedef struct AstTypeInt AstTypeInt;
-struct AstTypeInt
-{
-  u16 bits;
-  bool is_signed;
-};
-
-typedef union AstTypeData AstTypeData;
-union AstTypeData
-{
-  AstTypeInt Int;
-  StringView Identifier;
-};
-
-enum AstTypeTag
-  {
-    Ast_Type_Void,
-    Ast_Type_Bool,
-    Ast_Type_Int,
-    Ast_Type_Identifier,
-  };
-typedef enum AstTypeTag AstTypeTag;
-
-typedef struct AstType AstType;
-struct AstType
-{
-  AstTypeTag tag;
-  AstTypeData as;
   LineInfo line_info;
 };
