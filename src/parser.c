@@ -498,11 +498,9 @@ parse_stmt_block(Parser *p)
   TokenTag tt = peek_token(&p->lexer);
   while (tt != Token_End_Of_File && tt != Token_Close_Curly)
     {
-      AstStmt *stmt = parser_malloc(p, sizeof(*stmt));
-      *stmt = parse_stmt(p);
-
-      LinkedListNode *node = parser_malloc(p, sizeof(*node));
-      node->data = stmt;
+      AstStmt stmt = parse_stmt(p);
+      LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(stmt));
+      LINKED_LIST_NODE_DATA(AstStmt, node, stmt);
       linked_list_insert_last(&block, node);
 
       tt = peek_token(&p->lexer);
@@ -522,12 +520,11 @@ parse_single_stmt_or_block(Parser *p)
       return parse_stmt_block(p);
     default:
       {
-        AstStmt *stmt = parser_malloc(p, sizeof(*stmt));
-        *stmt = parse_stmt(p);
-
         AstStmtBlock block = { 0 };
-        LinkedListNode *node = parser_malloc(p, sizeof(*node));
-        node->data = stmt;
+
+        AstStmt stmt = parse_stmt(p);
+        LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(stmt));
+        LINKED_LIST_NODE_DATA(AstStmt, node, stmt);
         linked_list_insert_last(&block, node);
 
         return block;
@@ -557,11 +554,9 @@ parse(const char *filepath)
 
   while (peek_token(&parser.lexer) != Token_End_Of_File)
     {
-      AstStmt *stmt = parser_malloc(&parser, sizeof(*stmt));
-      *stmt = parse_stmt(&parser);
-
-      LinkedListNode *node = parser_malloc(&parser, sizeof(*node));
-      node->data = stmt;
+      AstStmt stmt = parse_stmt(&parser);
+      LinkedListNode *node = parser_malloc(&parser, sizeof(*node) + sizeof(stmt));
+      LINKED_LIST_NODE_DATA(AstStmt, node, stmt);
       linked_list_insert_last(&stmts, node);
     }
 

@@ -20,11 +20,14 @@ is_prefix(StringView prefix, StringView rest)
   return prefix.count <= rest.count && memcmp(prefix.data, rest.data, prefix.count) == 0;
 }
 
+#define LINKED_LIST_NODE_DATA(Type, node, node_data) *(Type *)(&(node)->data[0]) = node_data
+#define LINKED_LIST_NODE_DATA_PTR(Type, node) (Type *)(&(node)->data[0])
+
 typedef struct LinkedListNode LinkedListNode;
 struct LinkedListNode
 {
-  void *data;
   LinkedListNode *next, *prev;
+  char data[];
 };
 
 typedef struct LinkedList LinkedList;

@@ -266,7 +266,7 @@ transpile_to_c_stmt_block(AstStmtBlock block, size_t ident)
   PUTS("{\n");
   for (LinkedListNode *node = block.first; node != NULL; node = node->next)
     {
-      AstStmt *stmt = node->data;
+      AstStmt *stmt = LINKED_LIST_NODE_DATA_PTR(AstStmt, node);
       transpile_to_c_stmt(stmt, ident + TAB_SPACE);
       PUTS("\n");
     }
@@ -279,7 +279,7 @@ transpile_to_c(Ast *ast)
 {
   for (LinkedListNode *node = ast->stmts.first; node != NULL; node = node->next)
     {
-      AstStmt *stmt = node->data;
+      AstStmt *stmt = LINKED_LIST_NODE_DATA_PTR(AstStmt, node);
       transpile_to_c_stmt(stmt, 0);
       PUTS("\n");
     }
