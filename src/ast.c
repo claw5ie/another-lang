@@ -77,6 +77,12 @@ struct AstExprUnaryOp
   AstExpr *subexpr;
 };
 
+typedef struct AstExprArrayAccess AstExprArrayAccess;
+struct AstExprArrayAccess
+{
+  AstExpr *base, *index;
+};
+
 typedef struct AstExprTypeInt AstExprTypeInt;
 struct AstExprTypeInt
 {
@@ -84,14 +90,46 @@ struct AstExprTypeInt
   bool is_signed;
 };
 
+typedef struct AstDesignator AstDesignator;
+struct AstDesignator
+{
+  StringView name;
+  AstExpr *expr;
+};
+
+typedef union AstExprListData AstExprListData;
+union AstExprListData
+{
+  AstExpr *Expr;
+  AstDesignator Designator;
+  LinkedList Sublist;
+};
+
+enum AstExprListTag
+  {
+    Ast_Expr_List_Expr,
+    Ast_Expr_List_Designator,
+    Ast_Expr_List_Sublist,
+  };
+typedef enum AstExprListTag AstExprListTag;
+
+typedef struct AstExprList AstExprList;
+struct AstExprList
+{
+  AstExprListTag tag;
+  AstExprListData as;
+};
+
 typedef union AstExprData AstExprData;
 union AstExprData
 {
   AstExprBinaryOp Binary_Op;
   AstExprUnaryOp Unary_Op;
+  AstExprArrayAccess Array_Access;
+  AstExprTypeInt Type_Int;
   u64 Int64;
   bool Bool;
-  AstExprTypeInt Type_Int;
+  AstExprList Expr_List;
   StringView Identifier;
 };
 
@@ -99,11 +137,13 @@ enum AstExprTag
   {
     Ast_Expr_Binary_Op,
     Ast_Expr_Unary_Op,
+    Ast_Expr_Array_Access,
     Ast_Expr_Type_Void,
     Ast_Expr_Type_Bool,
     Ast_Expr_Type_Int,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
+    Ast_Expr_Expr_List,
     Ast_Expr_Identifier,
   };
 typedef enum AstExprTag AstExprTag;

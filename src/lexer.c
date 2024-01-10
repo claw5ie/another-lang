@@ -323,6 +323,16 @@ grab_token(Lexer *lexer)
   return lexer->tokens[lexer->token_start];
 }
 
+void
+putback_token(Lexer *lexer, Token *token)
+{
+  assert(lexer->token_count < LOOKAHEAD);
+  --lexer->token_start;
+  lexer->token_start %= LOOKAHEAD;
+  ++lexer->token_count;
+  lexer->tokens[lexer->token_start] = *token;
+}
+
 TokenTag
 peek_ahead_token(Lexer *lexer, u8 index)
 {

@@ -74,6 +74,70 @@ to_unary_op_tag(TokenTag op)
 
 AstExpr *parse_expr(Parser *);
 
+AstExprList
+parse_expr_list(Parser *p)
+{
+  switch (peek_token(&p->lexer))
+    {
+    case Token_Open_Curly:
+      {
+        advance_token(&p->lexer);
+
+        AstExprList list = {
+          .tag = Ast_Expr_List_Sublist,
+          .as = { .Sublist = { 0 } },
+        };
+
+        TokenTag tt = peek_token(&p->lexer);
+        while (tt != Token_End_Of_File && tt != Token_Close_Curly)
+          {
+            AstExprList sublist = parse_expr_list(p);
+            LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(sublist));
+            LINKED_LIST_NODE_DATA(AstExprList, node, sublist);
+            linked_list_insert_last(&list.as.Sublist, node);
+
+            tt = peek_token(&p->lexer);
+            if (tt != Token_End_Of_File && tt != Token_Close_Curly)
+              {
+                expect_token(&p->lexer, Token_Comma);
+                tt = peek_token(&p->lexer);
+              }
+          }
+
+        expect_token(&p->lexer, Token_Close_Curly);
+
+        return list;
+      }
+    case Token_Identifier:
+      {
+        if (peek_ahead_token(&p->lexer, 1) == Token_Equal)
+          {
+            Token token = grab_token(&p->lexer);
+            advance_many_tokens(&p->lexer, 2);
+            AstExpr *expr = parse_expr(p);
+            AstExprList list = {
+              .tag = Ast_Expr_List_Designator,
+              .as = { .Designator = {
+                  .name = token.text,
+                  .expr = expr,
+                } },
+            };
+            return list;
+          }
+      }
+      // fall through
+    default:
+      {
+        AstExpr *expr = parse_expr(p);
+        AstExprList list = {
+          .tag = Ast_Expr_List_Expr,
+          .as = { .Expr = expr },
+        };
+        return list;
+      }
+    }
+}
+
 // Cases here and in "parse_highest_prec_base" should match one to one. Don't forget to keep them in sync!!
 bool
 can_token_start_expression(TokenTag tag)
@@ -85,6 +149,7 @@ can_token_start_expression(TokenTag tag)
     case Token_Sub:
     case Token_Not:
     case Token_Ref:
+    case Token_Open_Curly:
     case Token_Void_Type:
     case Token_Bool_Type:
     case Token_Int_Type:
@@ -144,6 +209,16 @@ parse_highest_prec_base(Parser *p)
           .tag = to_unary_op_tag(token.tag),
           .subexpr = subexpr,
         };
+        return expr;
+      }
+    case Token_Open_Curly:
+      {
+        putback_token(&p->lexer, &token);
+        AstExprList expr_list = parse_expr_list(p);
+
+        expr->tag = Ast_Expr_Expr_List;
+        expr->as.Expr_List = expr_list;
+
         return expr;
       }
     case Token_Void_Type:
@@ -223,12 +298,33 @@ parse_highest_prec(Parser *p)
 
             LineInfo line_info = grab_token(&p->lexer).line_info;
             advance_token(&p->lexer);
+
             AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
             *new_base = (AstExpr){
               .tag = Ast_Expr_Unary_Op,
               .as = { .Unary_Op = {
                   .tag = Ast_Expr_Unary_Op_Deref,
                   .subexpr = base,
+                } },
+              .line_info = line_info,
+            };
+            base = new_base;
+          }
+
+          break;
+        case Token_Open_Bracket:
+          {
+            LineInfo line_info = grab_token(&p->lexer).line_info;
+            advance_token(&p->lexer);
+            AstExpr *expr = parse_expr(p);
+            expect_token(&p->lexer, Token_Close_Bracket);
+
+            AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
+            *new_base = (AstExpr){
+              .tag = Ast_Expr_Array_Access,
+              .as = { .Array_Access = {
+                  .base = base,
+                  .index = expr,
                 } },
               .line_info = line_info,
             };

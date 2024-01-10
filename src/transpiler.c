@@ -8,7 +8,43 @@ put_spaces(size_t count)
     PUTS(" ");
 }
 
+void transpile_to_c_expr(AstExpr *);
 void transpile_to_c_type(AstType *);
+
+void
+transpile_to_c_expr_list(AstExprList *list)
+{
+  switch (list->tag)
+    {
+    case Ast_Expr_List_Expr:
+      transpile_to_c_expr(list->as.Expr);
+      break;
+    case Ast_Expr_List_Designator:
+      {
+        AstDesignator *Designator = &list->as.Designator;
+
+        printf("%.*s = ", FORMAT_STRING_VIEW(Designator->name));
+        transpile_to_c_expr(Designator->expr);
+      }
+
+      break;
+    case Ast_Expr_List_Sublist:
+      {
+        LinkedList *sublist = &list->as.Sublist;
+
+        PUTS("{ ");
+        for (LinkedListNode *node = sublist->first; node != NULL; node = node->next)
+          {
+            AstExprList *subsublist = LINKED_LIST_NODE_DATA_PTR(AstExprList, node);
+            transpile_to_c_expr_list(subsublist);
+            PUTS(", ");
+          }
+        PUTS("}");
+      }
+
+      break;
+    }
+}
 
 void
 transpile_to_c_expr(AstExpr *expr)
@@ -84,6 +120,17 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
+    case Ast_Expr_Array_Access:
+      {
+        AstExprArrayAccess *Array_Access = &expr->as.Array_Access;
+
+        transpile_to_c_expr(Array_Access->base);
+        PUTS("[");
+        transpile_to_c_expr(Array_Access->index);
+        PUTS("]");
+      }
+
+      break;
     case Ast_Expr_Type_Void:
       PUTS("void");
       break;
@@ -111,6 +158,14 @@ transpile_to_c_expr(AstExpr *expr)
         u64 Bool = expr->as.Bool;
 
         printf("%s", Bool ? "true" : "false");
+      }
+
+      break;
+    case Ast_Expr_Expr_List:
+      {
+        AstExprList *Expr_List = &expr->as.Expr_List;
+
+        transpile_to_c_expr_list(Expr_List);
       }
 
       break;
