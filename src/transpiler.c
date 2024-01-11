@@ -233,7 +233,7 @@ transpile_to_c_procedure_header(LinkedList *params, AstType *return_type)
         printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
       PUTS(", ");
     }
-  PUTS(") ");
+  PUTS(") -> ");
   transpile_to_c_type(return_type);
 }
 

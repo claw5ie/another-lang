@@ -37,6 +37,7 @@ enum TokenTag
     Token_Equal,
     Token_Double_Colon,
     Token_Colon_Equal,
+    Token_Arrow,
 
     Token_If,
     Token_Then,
@@ -221,6 +222,7 @@ buffer_token(Lexer *lexer)
         { .text = STRING_VIEW_FROM_CSTRING(">="), .tag = Token_Geq           },
         { .text = STRING_VIEW_FROM_CSTRING("::"), .tag = Token_Double_Colon  },
         { .text = STRING_VIEW_FROM_CSTRING(":="), .tag = Token_Colon_Equal   },
+        { .text = STRING_VIEW_FROM_CSTRING("->"), .tag = Token_Arrow         },
         { .text = STRING_VIEW_FROM_CSTRING("<"),  .tag = Token_Lt            },
         { .text = STRING_VIEW_FROM_CSTRING(">"),  .tag = Token_Gt            },
         { .text = STRING_VIEW_FROM_CSTRING("+"),  .tag = Token_Add           },
@@ -307,6 +309,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Equal:
     case Token_Double_Colon:
     case Token_Colon_Equal:
+    case Token_Arrow:
     case Token_If:
     case Token_Then:
     case Token_Else:

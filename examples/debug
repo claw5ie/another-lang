@@ -18,9 +18,9 @@
 // };
 
 alias Foo = i32;
-alias Foo = proc() void;
+alias Foo = proc() -> void;
 
-proc foo(x :: bool, y :: i32) i32
+proc foo(x :: bool, y :: i32) -> i32
 {
   proc baz()
   {
@@ -42,7 +42,7 @@ proc main(bool, i32)
   2*(2+2);
   cast(2);
   cast(void *, 2);
-  2 + cast(i32, 2,);
+  2 + cast(proc() -> void, 2,);
   2 + cast(4);
 
   if 2 + 2 then

@@ -583,9 +583,11 @@ parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type)
 
   expect_token(&p->lexer, Token_Close_Paren);
 
-  tt = peek_token(&p->lexer);
-  if (tt != Token_Open_Curly && tt != Token_Equal && tt != Token_Semicolon)
-    *return_type = parse_type(p);
+  if (peek_token(&p->lexer) == Token_Arrow)
+    {
+      advance_token(&p->lexer);
+      *return_type = parse_type(p);
+    }
   else
     {
       AstType *type = parser_malloc(p, sizeof(*type));
