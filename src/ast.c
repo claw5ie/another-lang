@@ -125,6 +125,13 @@ struct AstExprTypeProc
   AstType *return_type;
 };
 
+typedef struct AstExprCast2 AstExprCast2;
+struct AstExprCast2
+{
+  AstExpr *type;
+  AstExpr *expr;
+};
+
 typedef struct AstDesignator AstDesignator;
 struct AstDesignator
 {
@@ -163,6 +170,8 @@ union AstExprData
   AstExprArrayAccess Array_Access;
   AstExprTypeInt Type_Int;
   AstExprTypeProc Type_Proc;
+  AstExpr *Cast1;
+  AstExprCast2 Cast2;
   u64 Int64;
   bool Bool;
   AstExprList Expr_List;
@@ -178,6 +187,8 @@ enum AstExprTag
     Ast_Expr_Type_Bool,
     Ast_Expr_Type_Int,
     Ast_Expr_Type_Proc,
+    Ast_Expr_Cast1,
+    Ast_Expr_Cast2,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
     Ast_Expr_Expr_List,

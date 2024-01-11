@@ -1,9 +1,35 @@
+#define EXPR_MAX_COUNT 2
+
 typedef struct Parser Parser;
 struct Parser
 {
   Lexer lexer;
   Arena arena;
+  AstExpr *exprs[EXPR_MAX_COUNT];
 };
+
+// Helps keep in sync 'parse_highest_prec_base' with 'parse_highest_prec'.
+enum ExprStartTag
+  {
+    Expr_Start_None,
+    Expr_Start_Double_Reference,
+    Expr_Start_Unary_Minus,
+    Expr_Start_Unary_Not,
+    Expr_Start_Unary_Reference,
+    Expr_Start_Parenthesized,
+    Expr_Start_Expression_List,
+    Expr_Start_Procedure_Type,
+    Expr_Start_Cast,
+    Expr_Start_Void_Type,
+    Expr_Start_Bool_Type,
+    Expr_Start_Int_Type,
+    Expr_Start_False,
+    Expr_Start_True,
+    Expr_Start_Null,
+    Expr_Start_Integer,
+    Expr_Start_Identifier,
+  };
+typedef enum ExprStartTag ExprStartTag;
 
 #define LOWEST_PREC (INT_MIN + 1)
 
@@ -61,14 +87,14 @@ to_binary_op_tag(TokenTag op)
 }
 
 AstExprUnaryOpTag
-to_unary_op_tag(TokenTag op)
+to_unary_op_tag(ExprStartTag op)
 {
   switch (op)
     {
-    case Token_Sub: return Ast_Expr_Unary_Op_Neg;
-    case Token_Not: return Ast_Expr_Unary_Op_Not;
-    case Token_Ref: return Ast_Expr_Unary_Op_Ref;
-    default:        assert(false);
+    case Expr_Start_Unary_Minus:     return Ast_Expr_Unary_Op_Neg;
+    case Expr_Start_Unary_Not:       return Ast_Expr_Unary_Op_Not;
+    case Expr_Start_Unary_Reference: return Ast_Expr_Unary_Op_Ref;
+    default:                         assert(false);
     }
 }
 
@@ -139,27 +165,56 @@ parse_expr_list(Parser *p)
     }
 }
 
-// Cases here and in "parse_highest_prec_base" should match one to one. Don't forget to keep them in sync!!
-bool
+ExprStartTag
 can_token_start_expression(TokenTag tag)
 {
   switch (tag)
     {
-    case Token_Open_Paren:
-    case Token_And:
-    case Token_Sub:
-    case Token_Not:
-    case Token_Ref:
-    case Token_Open_Curly:
-    case Token_Void_Type:
-    case Token_Bool_Type:
-    case Token_Int_Type:
-    case Token_False:
-    case Token_True:
-    case Token_Integer:
-    case Token_Identifier: return true;
-    default:               return false;
+    case Token_And:         return Expr_Start_Double_Reference;
+    case Token_Sub:         return Expr_Start_Unary_Minus;
+    case Token_Not:         return Expr_Start_Unary_Not;
+    case Token_Ref:         return Expr_Start_Unary_Reference;
+    case Token_Open_Paren:  return Expr_Start_Parenthesized;
+    case Token_Open_Curly:  return Expr_Start_Expression_List;
+    case Token_Proc:        return Expr_Start_Procedure_Type;
+    case Token_Cast:        return Expr_Start_Cast;
+    case Token_Void_Type:   return Expr_Start_Void_Type;
+    case Token_Bool_Type:   return Expr_Start_Bool_Type;
+    case Token_Int_Type:    return Expr_Start_Int_Type;
+    case Token_False:       return Expr_Start_False;
+    case Token_True:        return Expr_Start_True;
+    case Token_Null:        return Expr_Start_Null;
+    case Token_Integer:     return Expr_Start_Integer;
+    case Token_Identifier:  return Expr_Start_Identifier;
+    default:                return Expr_Start_None;
     }
+}
+
+size_t
+parse_fixed_size_arg_list(Parser *p)
+{
+  expect_token(&p->lexer, Token_Open_Paren);
+
+  size_t count = 0;
+  TokenTag tt = peek_token(&p->lexer);
+  for (; tt != Token_End_Of_File && tt != Token_Close_Paren; count++)
+    {
+      AstExpr *expr = parse_expr(p);
+
+      if (count < EXPR_MAX_COUNT)
+        p->exprs[count] = expr;
+
+      tt = peek_token(&p->lexer);
+      if (tt != Token_End_Of_File && tt != Token_Close_Paren)
+        {
+          expect_token(&p->lexer, Token_Comma);
+          tt = peek_token(&p->lexer);
+        }
+    }
+
+  expect_token(&p->lexer, Token_Close_Paren);
+
+  return count;
 }
 
 AstExpr *
@@ -168,19 +223,15 @@ parse_highest_prec_base(Parser *p)
   Token token = grab_token(&p->lexer);
   advance_token(&p->lexer);
 
-  if (token.tag == Token_Open_Paren)
+  ExprStartTag expr_start_tag = can_token_start_expression(token.tag);
+  switch (expr_start_tag)
     {
-      AstExpr *expr = parse_expr(p);
-      expect_token(&p->lexer, Token_Close_Paren);
-      return expr;
-    }
-
-  AstExpr *expr = parser_malloc(p, sizeof(*expr));
-  expr->line_info = token.line_info;
-
-  switch (token.tag)
-    {
-    case Token_And: // Double reference (as in '&&expr').
+    case Expr_Start_None:
+      {
+        PRINT_ERROR(p->lexer.filepath, token.line_info, "'%.*s' doesn't look like an expression", FORMAT_STRING_VIEW(token.text));
+        exit(EXIT_FAILURE);
+      }
+    case Expr_Start_Double_Reference: // '&&expr' is not tokenized as '& & expr'.
       {
         AstExpr *subsubexpr = parse_highest_prec_base(p);
         AstExpr *subexpr = parser_malloc(p, sizeof(*subexpr));
@@ -192,111 +243,187 @@ parse_highest_prec_base(Parser *p)
             } },
           .line_info = token.line_info,
         };
-        expr->tag = Ast_Expr_Unary_Op;
-        expr->as.Unary_Op = (AstExprUnaryOp){
-          .tag = Ast_Expr_Unary_Op_Ref,
-          .subexpr = subexpr,
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Unary_Op,
+          .as = { .Unary_Op = {
+              .tag = Ast_Expr_Unary_Op_Ref,
+              .subexpr = subexpr,
+            } },
+          .line_info = token.line_info,
         };
 
         return expr;
       }
-    case Token_Sub:
-    case Token_Not:
-    case Token_Ref:
+    case Expr_Start_Unary_Minus:
+    case Expr_Start_Unary_Not:
+    case Expr_Start_Unary_Reference:
       {
         AstExpr *subexpr = parse_highest_prec_base(p);
-        expr->tag = Ast_Expr_Unary_Op;
-        expr->as.Unary_Op = (AstExprUnaryOp){
-          .tag = to_unary_op_tag(token.tag),
-          .subexpr = subexpr,
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Unary_Op,
+          .as = { .Unary_Op = {
+              .tag = to_unary_op_tag(expr_start_tag),
+              .subexpr = subexpr,
+            } },
+          .line_info = token.line_info,
         };
         return expr;
       }
-    case Token_Open_Curly:
+    case Expr_Start_Parenthesized:
+      {
+        AstExpr *expr = parse_expr(p);
+        expect_token(&p->lexer, Token_Close_Paren);
+        return expr;
+      }
+    case Expr_Start_Expression_List:
       {
         putback_token(&p->lexer, &token);
         AstExprList expr_list = parse_expr_list(p);
-
-        expr->tag = Ast_Expr_Expr_List;
-        expr->as.Expr_List = expr_list;
-
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Expr_List,
+          .as = { .Expr_List = expr_list },
+          .line_info = token.line_info,
+        };
         return expr;
       }
-    case Token_Proc:
+    case Expr_Start_Procedure_Type:
       {
         LinkedList params = { 0 };
         AstType *return_type = NULL;
         parse_procedure_header(p, &params, &return_type);
-        expr->tag = Ast_Expr_Type_Proc;
-        expr->as.Type_Proc = (AstExprTypeProc){
-          .params = params,
-          .return_type = return_type,
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Type_Proc,
+          .as = { .Type_Proc = {
+              .params = params,
+              .return_type = return_type,
+            } },
+          .line_info = token.line_info,
         };
         return expr;
       }
-    case Token_Void_Type:
+    case Expr_Start_Cast:
       {
-        expr->tag = Ast_Expr_Type_Void;
-        return expr;
-      }
-    case Token_Bool_Type:
-      {
-        expr->tag = Ast_Expr_Type_Bool;
-        return expr;
-      }
-    case Token_Int_Type:
-      {
-        u16 bits = 0;
+        size_t count = parse_fixed_size_arg_list(p);
 
+        switch (count)
+          {
+          case 1:
+            {
+              AstExpr *expr = parser_malloc(p, sizeof(*expr));
+              *expr = (AstExpr){
+                .tag = Ast_Expr_Cast1,
+                .as = { .Cast1 = p->exprs[0] },
+                .line_info = token.line_info,
+              };
+              return expr;
+            }
+          case 2:
+            {
+              AstExpr *expr = parser_malloc(p, sizeof(*expr));
+              *expr = (AstExpr){
+                .tag = Ast_Expr_Cast2,
+                .as = { .Cast2 = {
+                    .type = p->exprs[0],
+                    .expr = p->exprs[1],
+                  } },
+                .line_info = token.line_info,
+              };
+              return expr;
+            }
+          default:
+            {
+              PRINT_ERROR(p->lexer.filepath, token.line_info, "expected 1 or 2 arguments, not %zu", count);
+              exit(EXIT_FAILURE);
+            }
+          }
+      }
+    case Expr_Start_Void_Type:
+      {
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Type_Void,
+          .line_info = token.line_info,
+        };
+        return expr;
+      }
+    case Expr_Start_Bool_Type:
+      {
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Type_Bool,
+          .line_info = token.line_info,
+        };
+        return expr;
+      }
+    case Expr_Start_Int_Type:
+      {
         StringView text = token.text;
-        for (size_t i = 1; i < text.count; i++)
-          bits = 10 * bits + (text.data[i] - '0');
+        ++text.data;
+        --text.count;
 
-        expr->tag = Ast_Expr_Type_Int;
-        expr->as.Type_Int = (AstExprTypeInt){
-          .bits = bits,
-          .is_signed = text.data[0] == 'i',
+        u16 bits = view_to_unsigned(text);
+        bool is_signed = text.data[-1] == 'i';
+
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Type_Int,
+          .as = { .Type_Int = {
+              .bits = bits,
+              .is_signed = is_signed,
+            } },
+          .line_info = token.line_info,
         };
 
         return expr;
       }
-    case Token_False:
-    case Token_True:
+    case Expr_Start_False:
+    case Expr_Start_True:
       {
-        expr->tag = Ast_Expr_Bool;
-        expr->as.Bool = token.tag == Token_True;
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Bool,
+          .as = { .Bool = token.tag == Token_True },
+          .line_info = token.line_info,
+        };
         return expr;
       }
-    case Token_Null:
+    case Expr_Start_Null:
       {
-        expr->tag = Ast_Expr_Null;
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Null,
+          .line_info = token.line_info,
+        };
         return expr;
       }
-    case Token_Integer:
+    case Expr_Start_Integer:
       {
-        u64 value = 0;
-
-        StringView text = token.text;
-        while (text.count-- > 0)
-          value = 10 * value + (*text.data++ - '0');
-
-        expr->tag = Ast_Expr_Int64;
-        expr->as.Int64 = value;
-
+        u64 value = view_to_unsigned(token.text);
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Int64,
+          .as = { .Int64 = value },
+          .line_info = token.line_info,
+        };
         return expr;
       }
-    case Token_Identifier:
+    case Expr_Start_Identifier:
       {
-        expr->tag = Ast_Expr_Identifier;
-        expr->as.Identifier = token.text;
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Identifier,
+          .as = { .Identifier = token.text },
+          .line_info = token.line_info,
+        };
         return expr;
-      }
-    default:
-      {
-        PRINT_ERROR(p->lexer.filepath, token.line_info, "'%.*s' doesn't look like an expression", FORMAT_STRING_VIEW(token.text));
-        exit(EXIT_FAILURE);
       }
     }
+
+  UNREACHABLE();
 }
 
 AstExpr *
@@ -311,7 +438,7 @@ parse_highest_prec(Parser *p)
         case Token_Mul:
           {
             TokenTag next = peek_ahead_token(&p->lexer, 1);
-            if (can_token_start_expression(next))
+            if (can_token_start_expression(next) != Expr_Start_None)
               goto finish_parsing_postfix_unary_operators;
 
             LineInfo line_info = grab_token(&p->lexer).line_info;

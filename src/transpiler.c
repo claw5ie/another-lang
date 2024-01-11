@@ -155,6 +155,24 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
+    case Ast_Expr_Cast1:
+      {
+        PUTS("(auto)");
+        transpile_to_c_expr(expr->as.Cast1);
+      }
+
+      break;
+    case Ast_Expr_Cast2:
+      {
+        AstExprCast2 *Cast2 = &expr->as.Cast2;
+
+        PUTS("(");
+        transpile_to_c_expr(Cast2->type);
+        PUTS(")");
+        transpile_to_c_expr(Cast2->expr);
+      }
+
+      break;
     case Ast_Expr_Int64:
       {
         u64 Int64 = expr->as.Int64;

@@ -20,6 +20,15 @@ is_prefix(StringView prefix, StringView rest)
   return prefix.count <= rest.count && memcmp(prefix.data, rest.data, prefix.count) == 0;
 }
 
+unsigned long long
+view_to_unsigned(StringView text)
+{
+  unsigned long long result = 0;
+  while (text.count-- > 0)
+    result = 10 * result + (*text.data++ - '0');
+  return result;
+}
+
 #define LINKED_LIST_PUT_NODE_DATA(Type, node, node_data) *(Type *)(&(node)->data[0]) = node_data
 #define LINKED_LIST_GET_NODE_DATA(Type, node) *(Type *)(&(node)->data[0])
 
