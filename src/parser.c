@@ -503,6 +503,28 @@ parse_symbol(Parser *p)
 
         return symbol;
       }
+    case Token_Alias:
+      {
+        advance_token(&p->lexer);
+
+        Token id_token = grab_token(&p->lexer);
+        expect_token(&p->lexer, Token_Identifier);
+        expect_token(&p->lexer, Token_Equal);
+        AstType *type = parse_type(p);
+        expect_token(&p->lexer, Token_Semicolon);
+
+        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        *symbol = (AstSymbol){
+          .tag = Ast_Symbol_Alias,
+          .as = { .Alias = {
+              .type = type,
+            } },
+          .name = id_token.text,
+          .line_info = id_token.line_info,
+        };
+
+        return symbol;
+      }
     case Token_Identifier:
       switch (peek_ahead_token(&p->lexer, 1))
         {
@@ -670,50 +692,42 @@ parse_stmt(Parser *p)
 
         return stmt;
       }
-    case Token_Proc:
+    default:
       {
         AstSymbol *symbol = parse_symbol(p);
-        assert(symbol != NULL); // 'parse_symbol' should exit if error happened.
-        stmt.tag = Ast_Stmt_Symbol;
-        stmt.as.Symbol = symbol;
-        return stmt;
-      }
-    case Token_Identifier:
-      {
-        AstSymbol *symbol = parse_symbol(p);
+
         if (symbol != NULL)
           {
             stmt.tag = Ast_Stmt_Symbol;
             stmt.as.Symbol = symbol;
             return stmt;
           }
-      }
-      // fall through
-    default:
-      {
-        AstExpr *lhs = parse_expr(p);
-
-        if (peek_token(&p->lexer) == Token_Equal)
+        else
           {
-            advance_token(&p->lexer);
-            AstExpr *rhs = parse_expr(p);
+            AstExpr *lhs = parse_expr(p);
+
+            if (peek_token(&p->lexer) == Token_Equal)
+              {
+                advance_token(&p->lexer);
+                AstExpr *rhs = parse_expr(p);
+                expect_token(&p->lexer, Token_Semicolon);
+
+                stmt.tag = Ast_Stmt_Assign;
+                stmt.as.Assign = (AstStmtAssign){
+                  .lhs = lhs,
+                  .rhs = rhs,
+                };
+
+                return stmt;
+              }
+
             expect_token(&p->lexer, Token_Semicolon);
 
-            stmt.tag = Ast_Stmt_Assign;
-            stmt.as.Assign = (AstStmtAssign){
-              .lhs = lhs,
-              .rhs = rhs,
-            };
+            stmt.tag = Ast_Stmt_Expr;
+            stmt.as.Expr = lhs;
 
             return stmt;
           }
-
-        expect_token(&p->lexer, Token_Semicolon);
-
-        stmt.tag = Ast_Stmt_Expr;
-        stmt.as.Expr = lhs;
-
-        return stmt;
       }
     }
 }

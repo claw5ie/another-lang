@@ -284,6 +284,17 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
       }
 
       break;
+    case Ast_Symbol_Alias:
+      {
+        AstSymbolAlias *Alias = &symbol->as.Alias;
+
+        put_spaces(ident);
+        PUTS("typedef ");
+        transpile_to_c_type(Alias->type);
+        printf(" %.*s;", FORMAT_STRING_VIEW(symbol->name));
+      }
+
+      break;
     }
 }
 

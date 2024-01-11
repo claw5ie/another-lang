@@ -17,8 +17,8 @@
 //   y :: i64,
 // };
 
-// Implement type aliases:
-// alias Foo = i32;
+alias Foo = i32;
+alias Foo = proc() void;
 
 // Implement type casting:
 // cast(type, expr);
@@ -33,6 +33,8 @@ proc foo(x :: bool, y :: i32) i32
 
 proc main(bool, i32)
 {
+  alias foo = i32;
+
   hello;
   2 + 2 * 2;
   (2 + 2) * 2;

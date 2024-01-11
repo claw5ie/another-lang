@@ -31,12 +31,19 @@ struct AstSymbolProcedure
   AstStmtBlock block;
 };
 
+typedef struct AstSymbolAlias AstSymbolAlias;
+struct AstSymbolAlias
+{
+  AstType *type;
+};
+
 typedef union AstSymbolData AstSymbolData;
 union AstSymbolData
 {
   AstSymbolVariable Variable;
   AstSymbolParameter Parameter;
   AstSymbolProcedure Procedure;
+  AstSymbolAlias Alias;
 };
 
 enum AstSymbolTag
@@ -44,6 +51,7 @@ enum AstSymbolTag
     Ast_Symbol_Variable,
     Ast_Symbol_Parameter,
     Ast_Symbol_Procedure,
+    Ast_Symbol_Alias,
   };
 typedef enum AstSymbolTag AstSymbolTag;
 

@@ -48,6 +48,7 @@ enum TokenTag
     Token_Return,
 
     Token_Proc,
+    Token_Alias,
 
     Token_Void_Type,
     Token_Bool_Type,
@@ -182,6 +183,7 @@ buffer_token(Lexer *lexer)
         { .text = STRING_VIEW_FROM_CSTRING("continue"), .tag = Token_Continue  },
         { .text = STRING_VIEW_FROM_CSTRING("return"),   .tag = Token_Return    },
         { .text = STRING_VIEW_FROM_CSTRING("proc"),     .tag = Token_Proc      },
+        { .text = STRING_VIEW_FROM_CSTRING("alias"),    .tag = Token_Alias     },
         { .text = STRING_VIEW_FROM_CSTRING("void"),     .tag = Token_Void_Type },
         { .text = STRING_VIEW_FROM_CSTRING("bool"),     .tag = Token_Bool_Type },
         { .text = STRING_VIEW_FROM_CSTRING("false"),    .tag = Token_False     },
@@ -283,6 +285,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Semicolon:     return "';'";
     case Token_Comma:         return "','";
     case Token_While:         return "'while'";
+    case Token_Identifier:    return "identifier";
     case Token_Or:
     case Token_And:
     case Token_Eq:
@@ -310,6 +313,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Continue:
     case Token_Return:
     case Token_Proc:
+    case Token_Alias:
     case Token_Void_Type:
     case Token_Bool_Type:
     case Token_Int_Type:
@@ -317,7 +321,6 @@ token_tag_to_string(TokenTag tag)
     case Token_True:
     case Token_Null:
     case Token_Integer:
-    case Token_Identifier:
     case Token_End_Of_File: UNREACHABLE();
     }
 
