@@ -73,6 +73,7 @@ to_unary_op_tag(TokenTag op)
 }
 
 AstExpr *parse_expr(Parser *);
+void parse_procedure_header(Parser *, LinkedList *, AstType **);
 
 AstExprList
 parse_expr_list(Parser *p)
@@ -93,7 +94,7 @@ parse_expr_list(Parser *p)
           {
             AstExprList sublist = parse_expr_list(p);
             LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(sublist));
-            LINKED_LIST_NODE_DATA(AstExprList, node, sublist);
+            LINKED_LIST_PUT_NODE_DATA(AstExprList, node, sublist);
             linked_list_insert_last(&list.as.Sublist, node);
 
             tt = peek_token(&p->lexer);
@@ -219,6 +220,18 @@ parse_highest_prec_base(Parser *p)
         expr->tag = Ast_Expr_Expr_List;
         expr->as.Expr_List = expr_list;
 
+        return expr;
+      }
+    case Token_Proc:
+      {
+        LinkedList params = { 0 };
+        AstType *return_type = NULL;
+        parse_procedure_header(p, &params, &return_type);
+        expr->tag = Ast_Expr_Type_Proc;
+        expr->as.Type_Proc = (AstExprTypeProc){
+          .params = params,
+          .return_type = return_type,
+        };
         return expr;
       }
     case Token_Void_Type:
@@ -392,11 +405,100 @@ parse_type(Parser *p)
   return parse_expr(p);
 }
 
+AstStmtBlock parse_stmt_block(Parser *);
+
+void
+parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type)
+{
+  expect_token(&p->lexer, Token_Open_Paren);
+
+  TokenTag tt = peek_token(&p->lexer);
+  while (tt != Token_End_Of_File && tt != Token_Close_Paren)
+    {
+      Token param_id_token = grab_token(&p->lexer);
+      bool has_name = false;
+
+      if (peek_token(&p->lexer) == Token_Identifier
+          && peek_ahead_token(&p->lexer, 1) == Token_Double_Colon)
+        {
+          advance_many_tokens(&p->lexer, 2);
+          has_name = true;
+        }
+
+      AstType *type = parse_type(p);
+
+      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+      *symbol = (AstSymbol){
+        .tag = Ast_Symbol_Parameter,
+        .as = { .Parameter = {
+            .type = type,
+            .has_name = has_name,
+          } },
+        .name = param_id_token.text,
+        .line_info = param_id_token.line_info,
+      };
+      LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
+      LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
+      linked_list_insert_last(params, node);
+
+      tt = peek_token(&p->lexer);
+      if (tt != Token_End_Of_File && tt != Token_Close_Paren)
+        {
+          expect_token(&p->lexer, Token_Comma);
+          tt = peek_token(&p->lexer);
+        }
+    }
+
+  expect_token(&p->lexer, Token_Close_Paren);
+
+  tt = peek_token(&p->lexer);
+  if (tt != Token_Open_Curly && tt != Token_Equal && tt != Token_Semicolon)
+    *return_type = parse_type(p);
+  else
+    {
+      AstType *type = parser_malloc(p, sizeof(*type));
+      *type = (AstType){
+        .tag = Ast_Expr_Type_Void,
+        .line_info = { 0 }, // What line info should I put here?
+      };
+      *return_type = type;
+    }
+}
+
 AstSymbol *
 parse_symbol(Parser *p)
 {
-  if (peek_token(&p->lexer) == Token_Identifier)
+  switch (peek_token(&p->lexer))
     {
+    case Token_Proc:
+      {
+        advance_token(&p->lexer);
+
+        Token id_token = grab_token(&p->lexer);
+
+        expect_token(&p->lexer, Token_Identifier);
+
+        LinkedList params = { 0 };
+        AstType *return_type = NULL;
+        parse_procedure_header(p, &params, &return_type);
+
+        AstStmtBlock block = parse_stmt_block(p);
+
+        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        *symbol = (AstSymbol){
+          .tag = Ast_Symbol_Procedure,
+          .as = { .Procedure = {
+              .params = params,
+              .return_type = return_type,
+              .block = block,
+            } },
+          .name = id_token.text,
+          .line_info = id_token.line_info,
+        };
+
+        return symbol;
+      }
+    case Token_Identifier:
       switch (peek_ahead_token(&p->lexer, 1))
         {
         case Token_Double_Colon:
@@ -450,12 +552,11 @@ parse_symbol(Parser *p)
         default:
           return NULL;
         }
+    default:
+      return NULL;
     }
-
-  return NULL;
 }
 
-AstStmtBlock parse_stmt_block(Parser *);
 AstStmtBlock parse_single_stmt_or_block(Parser *);
 
 AstStmt
@@ -544,6 +645,34 @@ parse_stmt(Parser *p)
       expect_token(&p->lexer, Token_Semicolon);
       stmt.tag = Ast_Stmt_Continue;
       return stmt;
+    case Token_Return:
+      {
+        advance_token(&p->lexer);
+        if (peek_token(&p->lexer) != Token_Semicolon)
+          {
+            AstExpr *expr = parse_expr(p);
+            expect_token(&p->lexer, Token_Semicolon);
+
+            stmt.tag = Ast_Stmt_Return_Expr;
+            stmt.as.Return_Expr = expr;
+
+            return stmt;
+          }
+
+        expect_token(&p->lexer, Token_Semicolon);
+
+        stmt.tag = Ast_Stmt_Return_Nothing;
+
+        return stmt;
+      }
+    case Token_Proc:
+      {
+        AstSymbol *symbol = parse_symbol(p);
+        assert(symbol != NULL); // 'parse_symbol' should exit if error happened.
+        stmt.tag = Ast_Stmt_Symbol;
+        stmt.as.Symbol = symbol;
+        return stmt;
+      }
     case Token_Identifier:
       {
         AstSymbol *symbol = parse_symbol(p);
@@ -596,7 +725,7 @@ parse_stmt_block(Parser *p)
     {
       AstStmt stmt = parse_stmt(p);
       LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(stmt));
-      LINKED_LIST_NODE_DATA(AstStmt, node, stmt);
+      LINKED_LIST_PUT_NODE_DATA(AstStmt, node, stmt);
       linked_list_insert_last(&block, node);
 
       tt = peek_token(&p->lexer);
@@ -620,7 +749,7 @@ parse_single_stmt_or_block(Parser *p)
 
         AstStmt stmt = parse_stmt(p);
         LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(stmt));
-        LINKED_LIST_NODE_DATA(AstStmt, node, stmt);
+        LINKED_LIST_PUT_NODE_DATA(AstStmt, node, stmt);
         linked_list_insert_last(&block, node);
 
         return block;
@@ -646,18 +775,24 @@ parse(const char *filepath)
     .arena = { 0 },
   };
 
-  LinkedList stmts = { 0 };
+  LinkedList symbols = { 0 };
 
   while (peek_token(&parser.lexer) != Token_End_Of_File)
     {
-      AstStmt stmt = parse_stmt(&parser);
-      LinkedListNode *node = parser_malloc(&parser, sizeof(*node) + sizeof(stmt));
-      LINKED_LIST_NODE_DATA(AstStmt, node, stmt);
-      linked_list_insert_last(&stmts, node);
+      AstSymbol *symbol = parse_symbol(&parser);
+      if (symbol == NULL)
+        {
+          Token token = grab_token(&parser.lexer);
+          PRINT_ERROR0(parser.lexer.filepath, token.line_info, "expected symbol definition");
+          exit(EXIT_FAILURE);
+        }
+      LinkedListNode *node = parser_malloc(&parser, sizeof(*node) + sizeof(symbol));
+      LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
+      linked_list_insert_last(&symbols, node);
     }
 
   Ast ast = {
-    .stmts = stmts,
+    .symbols = symbols,
     .arena = parser.arena,
   };
 

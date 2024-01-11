@@ -37,6 +37,8 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Do:            return "Do";
     case Token_Break:         return "Break";
     case Token_Continue:      return "Continue";
+    case Token_Return:        return "Return";
+    case Token_Proc:          return "Proc";
     case Token_Void_Type:     return "Void_Type";
     case Token_Bool_Type:     return "Bool_Type";
     case Token_Int_Type:      return "Int_Type";

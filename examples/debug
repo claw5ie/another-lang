@@ -1,40 +1,81 @@
-hello;
-2 + 2 * 2;
-(2 + 2) * 2;
--2 + --2;
-!false && true || false;
-1 <= 2;
-(2+2)*2;
-2*(2+2);
+// Implement enums, onions, struct:
+// enum Bar
+// {
+//   Hello,
+//   World,
+// };
 
-if 2 + 2 then
+// union Baz
+// {
+//   x :: i32,
+//   y :: i64,
+// };
+
+// struct Foo
+// {
+//   x :: i32,
+//   y :: i64,
+// };
+
+// Implement type aliases:
+// alias Foo = i32;
+
+// Implement type casting:
+// cast(type, expr);
+
+proc foo(x :: bool, y :: i32) i32
+{
+  proc baz()
   {
-    if 2 2;
-    2 = 2;
   }
-else
-  {
-    4 * 4;
-  }
+  return x;
+}
 
-while false do
-  {
-  }
+proc main(bool, i32)
+{
+  hello;
+  2 + 2 * 2;
+  (2 + 2) * 2;
+  -2 + --2;
+  !false && true || false;
+  1 <= 2;
+  (2+2)*2;
+  2*(2+2);
 
-do
- { }
-while true;
+  if 2 + 2 then
+    {
+      if 2 2;
+      2 = 2;
+    }
+  else
+    {
+      4 * 4;
+    }
 
-a :: int = 42;
-a :: i32 = 42;
-a :: i42 = 42;
-a = 69;
-b := false;
+  while false do
+    {
+    }
 
-a :: i42 = 42;
-b :: i42* = &a;
-c :: i42 = b**;
+  do
+   { }
+  while true;
 
-a :: i32[3] = { 42, { 42 }, 90 };
+  a :: int = 42;
+  a :: i32 = 42;
+  a :: i42 = 42;
+  a = 69;
+  b := false;
 
-a[2][42] = 42;
+  a :: i42 = 42;
+  b :: i42* = &a;
+  c :: i42 = b**;
+
+  a :: i32[3] = { 42, { 42 }, 90 };
+
+  a[2][42] = 42;
+
+  a :: proc(i32, hello :: bool);
+  a :: proc(i32, hello :: bool) = null;
+
+  return;
+}

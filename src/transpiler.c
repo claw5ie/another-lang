@@ -10,6 +10,7 @@ put_spaces(size_t count)
 
 void transpile_to_c_expr(AstExpr *);
 void transpile_to_c_type(AstType *);
+void transpile_to_c_procedure_header(LinkedList *, AstType *);
 
 void
 transpile_to_c_expr_list(AstExprList *list)
@@ -35,7 +36,7 @@ transpile_to_c_expr_list(AstExprList *list)
         PUTS("{ ");
         for (LinkedListNode *node = sublist->first; node != NULL; node = node->next)
           {
-            AstExprList *subsublist = LINKED_LIST_NODE_DATA_PTR(AstExprList, node);
+            AstExprList *subsublist = &LINKED_LIST_GET_NODE_DATA(AstExprList, node);
             transpile_to_c_expr_list(subsublist);
             PUTS(", ");
           }
@@ -145,6 +146,15 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
+    case Ast_Expr_Type_Proc:
+      {
+        AstExprTypeProc *Type_Proc = &expr->as.Type_Proc;
+
+        PUTS("proc");
+        transpile_to_c_procedure_header(&Type_Proc->params, Type_Proc->return_type);
+      }
+
+      break;
     case Ast_Expr_Int64:
       {
         u64 Int64 = expr->as.Int64;
@@ -184,6 +194,26 @@ void
 transpile_to_c_type(AstType *type)
 {
   transpile_to_c_expr(type);
+}
+
+void transpile_to_c_stmt_block(AstStmtBlock, size_t);
+
+void
+transpile_to_c_procedure_header(LinkedList *params, AstType *return_type)
+{
+  PUTS("( ");
+  for (LinkedListNode *node = params->first; node != NULL; node = node->next)
+    {
+      AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
+      AstSymbolParameter *Parameter = &symbol->as.Parameter;
+
+      transpile_to_c_type(Parameter->type);
+      if (Parameter->has_name)
+        printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+      PUTS(", ");
+    }
+  PUTS(") ");
+  transpile_to_c_type(return_type);
 }
 
 void
@@ -230,10 +260,29 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
       }
 
       break;
+    case Ast_Symbol_Parameter:
+      {
+        AstSymbolParameter *Parameter = &symbol->as.Parameter;
+
+        printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
+        transpile_to_c_type(Parameter->type);
+      }
+
+      break;
+    case Ast_Symbol_Procedure:
+      {
+        AstSymbolProcedure *Procedure = &symbol->as.Procedure;
+
+        put_spaces(ident);
+        printf("proc %.*s", FORMAT_STRING_VIEW(symbol->name));
+        transpile_to_c_procedure_header(&Procedure->params, Procedure->return_type);
+        PUTS("\n");
+        transpile_to_c_stmt_block(Procedure->block, ident);
+      }
+
+      break;
     }
 }
-
-void transpile_to_c_stmt_block(AstStmtBlock, size_t);
 
 void
 transpile_to_c_stmt(AstStmt *stmt, size_t ident)
@@ -291,6 +340,16 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
       put_spaces(ident);
       PUTS("continue;");
       break;
+    case Ast_Stmt_Return_Nothing:
+      put_spaces(ident);
+      PUTS("return;");
+      break;
+    case Ast_Stmt_Return_Expr:
+      put_spaces(ident);
+      PUTS("return ");
+      transpile_to_c_expr(stmt->as.Return_Expr);
+      PUTS(";");
+      break;
     case Ast_Stmt_Assign:
       {
         AstStmtAssign *Assign = &stmt->as.Assign;
@@ -321,7 +380,7 @@ transpile_to_c_stmt_block(AstStmtBlock block, size_t ident)
   PUTS("{\n");
   for (LinkedListNode *node = block.first; node != NULL; node = node->next)
     {
-      AstStmt *stmt = LINKED_LIST_NODE_DATA_PTR(AstStmt, node);
+      AstStmt *stmt = &LINKED_LIST_GET_NODE_DATA(AstStmt, node);
       transpile_to_c_stmt(stmt, ident + TAB_SPACE);
       PUTS("\n");
     }
@@ -332,10 +391,10 @@ transpile_to_c_stmt_block(AstStmtBlock block, size_t ident)
 void
 transpile_to_c(Ast *ast)
 {
-  for (LinkedListNode *node = ast->stmts.first; node != NULL; node = node->next)
+  for (LinkedListNode *node = ast->symbols.first; node != NULL; node = node->next)
     {
-      AstStmt *stmt = LINKED_LIST_NODE_DATA_PTR(AstStmt, node);
-      transpile_to_c_stmt(stmt, 0);
+      AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
+      transpile_to_c_symbol(symbol, 0);
       PUTS("\n");
     }
 }

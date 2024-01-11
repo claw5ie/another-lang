@@ -45,6 +45,9 @@ enum TokenTag
     Token_Do,
     Token_Break,
     Token_Continue,
+    Token_Return,
+
+    Token_Proc,
 
     Token_Void_Type,
     Token_Bool_Type,
@@ -176,6 +179,8 @@ buffer_token(Lexer *lexer)
         { .text = STRING_VIEW_FROM_CSTRING("do"),       .tag = Token_Do        },
         { .text = STRING_VIEW_FROM_CSTRING("break"),    .tag = Token_Break     },
         { .text = STRING_VIEW_FROM_CSTRING("continue"), .tag = Token_Continue  },
+        { .text = STRING_VIEW_FROM_CSTRING("return"),   .tag = Token_Return    },
+        { .text = STRING_VIEW_FROM_CSTRING("proc"),     .tag = Token_Proc      },
         { .text = STRING_VIEW_FROM_CSTRING("void"),     .tag = Token_Void_Type },
         { .text = STRING_VIEW_FROM_CSTRING("bool"),     .tag = Token_Bool_Type },
         { .text = STRING_VIEW_FROM_CSTRING("false"),    .tag = Token_False     },
@@ -267,9 +272,15 @@ token_tag_to_string(TokenTag tag)
 {
   switch (tag)
     {
-    case Token_Open_Paren:  return "'('";
-    case Token_Close_Paren: return "')'";
-    case Token_Semicolon:   return "';'";
+    case Token_Open_Paren:    return "'('";
+    case Token_Close_Paren:   return "')'";
+    case Token_Open_Curly:    return "'{'";
+    case Token_Close_Curly:   return "'}'";
+    case Token_Open_Bracket:  return "'['";
+    case Token_Close_Bracket: return "']'";
+    case Token_Semicolon:     return "';'";
+    case Token_Comma:         return "','";
+    case Token_While:         return "'while'";
     case Token_Or:
     case Token_And:
     case Token_Eq:
@@ -285,22 +296,18 @@ token_tag_to_string(TokenTag tag)
     case Token_Mod:
     case Token_Not:
     case Token_Ref:
-    case Token_Open_Curly:
-    case Token_Close_Curly:
-    case Token_Open_Bracket:
-    case Token_Close_Bracket:
     case Token_Dot:
-    case Token_Comma:
     case Token_Equal:
     case Token_Double_Colon:
     case Token_Colon_Equal:
     case Token_If:
     case Token_Then:
     case Token_Else:
-    case Token_While:
     case Token_Do:
     case Token_Break:
     case Token_Continue:
+    case Token_Return:
+    case Token_Proc:
     case Token_Void_Type:
     case Token_Bool_Type:
     case Token_Int_Type:

@@ -1,12 +1,13 @@
 typedef struct Ast Ast;
 struct Ast
 {
-  LinkedList stmts;
+  LinkedList symbols;
   Arena arena;
 };
 
 typedef struct AstExpr AstExpr;
 typedef AstExpr AstType;
+typedef LinkedList AstStmtBlock;
 
 typedef struct AstSymbolVariable AstSymbolVariable;
 struct AstSymbolVariable
@@ -15,15 +16,34 @@ struct AstSymbolVariable
   AstExpr *expr;
 };
 
+typedef struct AstSymbolParameter AstSymbolParameter;
+struct AstSymbolParameter
+{
+  AstType *type;
+  bool has_name;
+};
+
+typedef struct AstSymbolProcedure AstSymbolProcedure;
+struct AstSymbolProcedure
+{
+  LinkedList params;
+  AstType *return_type;
+  AstStmtBlock block;
+};
+
 typedef union AstSymbolData AstSymbolData;
 union AstSymbolData
 {
   AstSymbolVariable Variable;
+  AstSymbolParameter Parameter;
+  AstSymbolProcedure Procedure;
 };
 
 enum AstSymbolTag
   {
     Ast_Symbol_Variable,
+    Ast_Symbol_Parameter,
+    Ast_Symbol_Procedure,
   };
 typedef enum AstSymbolTag AstSymbolTag;
 
@@ -90,6 +110,13 @@ struct AstExprTypeInt
   bool is_signed;
 };
 
+typedef struct AstExprTypeProc AstExprTypeProc;
+struct AstExprTypeProc
+{
+  LinkedList params;
+  AstType *return_type;
+};
+
 typedef struct AstDesignator AstDesignator;
 struct AstDesignator
 {
@@ -127,6 +154,7 @@ union AstExprData
   AstExprUnaryOp Unary_Op;
   AstExprArrayAccess Array_Access;
   AstExprTypeInt Type_Int;
+  AstExprTypeProc Type_Proc;
   u64 Int64;
   bool Bool;
   AstExprList Expr_List;
@@ -141,6 +169,7 @@ enum AstExprTag
     Ast_Expr_Type_Void,
     Ast_Expr_Type_Bool,
     Ast_Expr_Type_Int,
+    Ast_Expr_Type_Proc,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
     Ast_Expr_Expr_List,
@@ -154,8 +183,6 @@ struct AstExpr
   AstExprData as;
   LineInfo line_info;
 };
-
-typedef LinkedList AstStmtBlock;
 
 typedef struct AstStmtIf AstStmtIf;
 struct AstStmtIf
@@ -184,6 +211,7 @@ union AstStmtData
   AstStmtBlock Block;
   AstStmtIf If;
   AstStmtWhile While;
+  AstExpr *Return_Expr;
   AstStmtAssign Assign;
   AstSymbol *Symbol;
   AstExpr *Expr;
@@ -196,6 +224,8 @@ enum AstStmtTag
     Ast_Stmt_While,
     Ast_Stmt_Break,
     Ast_Stmt_Continue,
+    Ast_Stmt_Return_Nothing,
+    Ast_Stmt_Return_Expr,
     Ast_Stmt_Assign,
     Ast_Stmt_Symbol,
     Ast_Stmt_Expr,
