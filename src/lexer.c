@@ -55,6 +55,7 @@ enum TokenTag
 
     Token_False,
     Token_True,
+    Token_Null,
 
     Token_Integer,
     Token_Identifier,
@@ -185,6 +186,7 @@ buffer_token(Lexer *lexer)
         { .text = STRING_VIEW_FROM_CSTRING("bool"),     .tag = Token_Bool_Type },
         { .text = STRING_VIEW_FROM_CSTRING("false"),    .tag = Token_False     },
         { .text = STRING_VIEW_FROM_CSTRING("true"),     .tag = Token_True      },
+        { .text = STRING_VIEW_FROM_CSTRING("null"),     .tag = Token_Null      },
       };
 
       for (size_t i = 0; i < ARRAY_COUNT(keywords); i++)
@@ -313,6 +315,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Int_Type:
     case Token_False:
     case Token_True:
+    case Token_Null:
     case Token_Integer:
     case Token_Identifier:
     case Token_End_Of_File: UNREACHABLE();

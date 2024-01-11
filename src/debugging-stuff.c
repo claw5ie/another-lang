@@ -44,6 +44,7 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Int_Type:      return "Int_Type";
     case Token_False:         return "False";
     case Token_True:          return "True";
+    case Token_Null:          return "Null";
     case Token_Integer:       return "Integer";
     case Token_Identifier:    return "Identifier";
     case Token_End_Of_File:   return "End_Of_File";

@@ -187,6 +187,9 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
+    case Ast_Expr_Null:
+      PUTS("NULL");
+      break;
     }
 }
 

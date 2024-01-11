@@ -267,6 +267,11 @@ parse_highest_prec_base(Parser *p)
         expr->as.Bool = token.tag == Token_True;
         return expr;
       }
+    case Token_Null:
+      {
+        expr->tag = Ast_Expr_Null;
+        return expr;
+      }
     case Token_Integer:
       {
         u64 value = 0;

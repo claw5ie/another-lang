@@ -174,6 +174,7 @@ enum AstExprTag
     Ast_Expr_Bool,
     Ast_Expr_Expr_List,
     Ast_Expr_Identifier,
+    Ast_Expr_Null,
   };
 typedef enum AstExprTag AstExprTag;
 
