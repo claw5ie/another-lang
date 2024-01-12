@@ -73,18 +73,18 @@ proc main(bool, i32)
   b :: i42* = &a;
   c :: i42 = b**;
 
-  a :: i32[3] = { 42, { 42 }, 90 };
+  a :: i32[3] = _(42, _(42), 90);
 
   a[2][42] = 42;
 
   a :: proc(i32, hello :: bool);
   a :: proc(i32, hello :: bool) = null;
 
-  a = { hello = 42 };
+  a = _(hello = 42);
 
   a();
   (bar)(name = 42);
-  (hello*)(2, 3, (4 - 4), { 2, 3 });
+  (hello*)(2, 3, (4 - 4), _(2, 3));
 
   return;
 }

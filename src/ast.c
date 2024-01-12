@@ -159,7 +159,6 @@ union AstExprData
   AstExprCast2 Cast2;
   u64 Int64;
   bool Bool;
-  LinkedList Expr_List;
   AstExprDesignator Designator;
   StringView Identifier;
 };
@@ -178,7 +177,6 @@ enum AstExprTag
     Ast_Expr_Cast2,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
-    Ast_Expr_Expr_List,
     Ast_Expr_Designator,
     Ast_Expr_Null,
     Ast_Expr_Identifier,

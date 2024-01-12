@@ -176,16 +176,6 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
-    case Ast_Expr_Expr_List:
-      {
-        LinkedList *Expr_List = &expr->as.Expr_List;
-
-        PUTS("{ ");
-        transpile_to_c_comma_separated_exprs(Expr_List);
-        PUTS("}");
-      }
-
-      break;
     case Ast_Expr_Designator:
       {
         AstExprDesignator *Designator = &expr->as.Designator;

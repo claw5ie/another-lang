@@ -17,7 +17,6 @@ enum ExprStartTag
     Expr_Start_Unary_Not,
     Expr_Start_Unary_Reference,
     Expr_Start_Parenthesized,
-    Expr_Start_Expression_List,
     Expr_Start_Procedure_Type,
     Expr_Start_Cast,
     Expr_Start_Void_Type,
@@ -158,7 +157,6 @@ can_token_start_expression(TokenTag tag)
     case Token_Not:         return Expr_Start_Unary_Not;
     case Token_Ref:         return Expr_Start_Unary_Reference;
     case Token_Open_Paren:  return Expr_Start_Parenthesized;
-    case Token_Open_Curly:  return Expr_Start_Expression_List;
     case Token_Proc:        return Expr_Start_Procedure_Type;
     case Token_Cast:        return Expr_Start_Cast;
     case Token_Void_Type:   return Expr_Start_Void_Type;
@@ -258,18 +256,6 @@ parse_highest_prec_base(Parser *p)
       {
         AstExpr *expr = parse_expr(p);
         expect_token(&p->lexer, Token_Close_Paren);
-        return expr;
-      }
-    case Expr_Start_Expression_List:
-      {
-        putback_token(&p->lexer, &token);
-        LinkedList expr_list = parse_comma_separated_exprs(p, Token_Open_Curly, Token_Close_Curly);
-        AstExpr *expr = parser_malloc(p, sizeof(*expr));
-        *expr = (AstExpr){
-          .tag = Ast_Expr_Expr_List,
-          .as = { .Expr_List = expr_list },
-          .line_info = token.line_info,
-        };
         return expr;
       }
     case Expr_Start_Procedure_Type:
