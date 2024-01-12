@@ -684,7 +684,7 @@ parse_symbol(Parser *p)
 
             return symbol;
           }
-        case Token_Colon_Equal:
+        case Token_Double_Colon_Equal:
           {
             Token id_token = grab_token(&p->lexer);
             advance_many_tokens(&p->lexer, 2);

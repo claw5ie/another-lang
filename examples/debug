@@ -67,7 +67,7 @@ proc main(bool, i32)
   a :: i32 = 42;
   a :: i42 = 42;
   a = 69;
-  b := false;
+  b ::= false;
 
   a :: i42 = 42;
   b :: i42* = &a;

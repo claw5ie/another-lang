@@ -36,7 +36,7 @@ enum TokenTag
     Token_Comma,
     Token_Equal,
     Token_Double_Colon,
-    Token_Colon_Equal,
+    Token_Double_Colon_Equal,
     Token_Arrow,
 
     Token_If,
@@ -214,34 +214,34 @@ buffer_token(Lexer *lexer)
       };
 
       const Symbol symbols[] = {
-        { .text = STRING_VIEW_FROM_CSTRING("||"), .tag = Token_Or            },
-        { .text = STRING_VIEW_FROM_CSTRING("&&"), .tag = Token_And           },
-        { .text = STRING_VIEW_FROM_CSTRING("=="), .tag = Token_Eq            },
-        { .text = STRING_VIEW_FROM_CSTRING("!="), .tag = Token_Neq           },
-        { .text = STRING_VIEW_FROM_CSTRING("<="), .tag = Token_Leq           },
-        { .text = STRING_VIEW_FROM_CSTRING(">="), .tag = Token_Geq           },
-        { .text = STRING_VIEW_FROM_CSTRING("::"), .tag = Token_Double_Colon  },
-        { .text = STRING_VIEW_FROM_CSTRING(":="), .tag = Token_Colon_Equal   },
-        { .text = STRING_VIEW_FROM_CSTRING("->"), .tag = Token_Arrow         },
-        { .text = STRING_VIEW_FROM_CSTRING("<"),  .tag = Token_Lt            },
-        { .text = STRING_VIEW_FROM_CSTRING(">"),  .tag = Token_Gt            },
-        { .text = STRING_VIEW_FROM_CSTRING("+"),  .tag = Token_Add           },
-        { .text = STRING_VIEW_FROM_CSTRING("-"),  .tag = Token_Sub           },
-        { .text = STRING_VIEW_FROM_CSTRING("*"),  .tag = Token_Mul           },
-        { .text = STRING_VIEW_FROM_CSTRING("/"),  .tag = Token_Div           },
-        { .text = STRING_VIEW_FROM_CSTRING("%"),  .tag = Token_Mod           },
-        { .text = STRING_VIEW_FROM_CSTRING("!"),  .tag = Token_Not           },
-        { .text = STRING_VIEW_FROM_CSTRING("&"),  .tag = Token_Ref           },
-        { .text = STRING_VIEW_FROM_CSTRING("("),  .tag = Token_Open_Paren    },
-        { .text = STRING_VIEW_FROM_CSTRING(")"),  .tag = Token_Close_Paren   },
-        { .text = STRING_VIEW_FROM_CSTRING("{"),  .tag = Token_Open_Curly    },
-        { .text = STRING_VIEW_FROM_CSTRING("}"),  .tag = Token_Close_Curly   },
-        { .text = STRING_VIEW_FROM_CSTRING("["),  .tag = Token_Open_Bracket  },
-        { .text = STRING_VIEW_FROM_CSTRING("]"),  .tag = Token_Close_Bracket },
-        { .text = STRING_VIEW_FROM_CSTRING(";"),  .tag = Token_Semicolon     },
-        { .text = STRING_VIEW_FROM_CSTRING("."),  .tag = Token_Dot           },
-        { .text = STRING_VIEW_FROM_CSTRING(","),  .tag = Token_Comma         },
-        { .text = STRING_VIEW_FROM_CSTRING("="),  .tag = Token_Equal         },
+        { .text = STRING_VIEW_FROM_CSTRING("::="), .tag = Token_Double_Colon_Equal },
+        { .text = STRING_VIEW_FROM_CSTRING("||"),  .tag = Token_Or            },
+        { .text = STRING_VIEW_FROM_CSTRING("&&"),  .tag = Token_And           },
+        { .text = STRING_VIEW_FROM_CSTRING("=="),  .tag = Token_Eq            },
+        { .text = STRING_VIEW_FROM_CSTRING("!="),  .tag = Token_Neq           },
+        { .text = STRING_VIEW_FROM_CSTRING("<="),  .tag = Token_Leq           },
+        { .text = STRING_VIEW_FROM_CSTRING(">="),  .tag = Token_Geq           },
+        { .text = STRING_VIEW_FROM_CSTRING("::"),  .tag = Token_Double_Colon  },
+        { .text = STRING_VIEW_FROM_CSTRING("->"),  .tag = Token_Arrow         },
+        { .text = STRING_VIEW_FROM_CSTRING("<"),   .tag = Token_Lt            },
+        { .text = STRING_VIEW_FROM_CSTRING(">"),   .tag = Token_Gt            },
+        { .text = STRING_VIEW_FROM_CSTRING("+"),   .tag = Token_Add           },
+        { .text = STRING_VIEW_FROM_CSTRING("-"),   .tag = Token_Sub           },
+        { .text = STRING_VIEW_FROM_CSTRING("*"),   .tag = Token_Mul           },
+        { .text = STRING_VIEW_FROM_CSTRING("/"),   .tag = Token_Div           },
+        { .text = STRING_VIEW_FROM_CSTRING("%"),   .tag = Token_Mod           },
+        { .text = STRING_VIEW_FROM_CSTRING("!"),   .tag = Token_Not           },
+        { .text = STRING_VIEW_FROM_CSTRING("&"),   .tag = Token_Ref           },
+        { .text = STRING_VIEW_FROM_CSTRING("("),   .tag = Token_Open_Paren    },
+        { .text = STRING_VIEW_FROM_CSTRING(")"),   .tag = Token_Close_Paren   },
+        { .text = STRING_VIEW_FROM_CSTRING("{"),   .tag = Token_Open_Curly    },
+        { .text = STRING_VIEW_FROM_CSTRING("}"),   .tag = Token_Close_Curly   },
+        { .text = STRING_VIEW_FROM_CSTRING("["),   .tag = Token_Open_Bracket  },
+        { .text = STRING_VIEW_FROM_CSTRING("]"),   .tag = Token_Close_Bracket },
+        { .text = STRING_VIEW_FROM_CSTRING(";"),   .tag = Token_Semicolon     },
+        { .text = STRING_VIEW_FROM_CSTRING("."),   .tag = Token_Dot           },
+        { .text = STRING_VIEW_FROM_CSTRING(","),   .tag = Token_Comma         },
+        { .text = STRING_VIEW_FROM_CSTRING("="),   .tag = Token_Equal         },
       };
 
       StringView rest = { .data = &text[at], .count = lexer->source_code_size - at };
@@ -308,7 +308,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Dot:
     case Token_Equal:
     case Token_Double_Colon:
-    case Token_Colon_Equal:
+    case Token_Double_Colon_Equal:
     case Token_Arrow:
     case Token_If:
     case Token_Then:

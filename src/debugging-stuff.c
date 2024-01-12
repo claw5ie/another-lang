@@ -29,7 +29,7 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Comma:         return "Comma";
     case Token_Equal:         return "Equal";
     case Token_Double_Colon:  return "Double_Colon";
-    case Token_Colon_Equal:   return "Colon_Equal";
+    case Token_Double_Colon_Equal: return "Double_Colon_Equal";
     case Token_Arrow:         return "Arrow";
     case Token_If:            return "If";
     case Token_Then:          return "Then";
