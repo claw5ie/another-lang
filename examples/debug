@@ -37,6 +37,10 @@ proc main(bool, i32)
   a :: Foo = _(x = 2);
   a ::= Foo(x = 2);
 
+  a :: struct{ x :: int };
+  a :: enum{ x };
+  alias Foo = union{ x :: 42 };
+
   Foo.Hello;
   foo.hello;
 

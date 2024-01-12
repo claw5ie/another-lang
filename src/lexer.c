@@ -296,6 +296,7 @@ token_tag_to_string(TokenTag tag)
     case Token_Close_Bracket: return "']'";
     case Token_Semicolon:     return "';'";
     case Token_Comma:         return "','";
+    case Token_Double_Colon:  return "'::'";
     case Token_While:         return "'while'";
     case Token_Identifier:    return "identifier";
     case Token_Or:
@@ -315,7 +316,6 @@ token_tag_to_string(TokenTag tag)
     case Token_Ref:
     case Token_Dot:
     case Token_Equal:
-    case Token_Double_Colon:
     case Token_Double_Colon_Equal:
     case Token_Arrow:
     case Token_If:
