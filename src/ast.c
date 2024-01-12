@@ -31,6 +31,30 @@ struct AstSymbolProcedure
   AstStmtBlock block;
 };
 
+typedef struct AstSymbolStructField AstSymbolStructField;
+struct AstSymbolStructField
+{
+  AstType *type;
+};
+
+typedef struct AstSymbolStruct AstSymbolStruct;
+struct AstSymbolStruct
+{
+  LinkedList fields;
+};
+
+typedef struct AstSymbolEnumValue AstSymbolEnumValue;
+struct AstSymbolEnumValue
+{
+  int dummy;
+};
+
+typedef struct AstSymbolEnum AstSymbolEnum;
+struct AstSymbolEnum
+{
+  LinkedList values;
+};
+
 typedef struct AstSymbolAlias AstSymbolAlias;
 struct AstSymbolAlias
 {
@@ -43,7 +67,12 @@ union AstSymbolData
   AstSymbolVariable Variable;
   AstSymbolParameter Parameter;
   AstSymbolProcedure Procedure;
+  AstSymbolStruct Struct;
+  AstSymbolStruct Union;
+  AstSymbolEnum Enum;
   AstSymbolAlias Alias;
+  AstSymbolStructField Struct_Field;
+  AstSymbolEnumValue Enum_Value;
 };
 
 enum AstSymbolTag
@@ -51,7 +80,12 @@ enum AstSymbolTag
     Ast_Symbol_Variable,
     Ast_Symbol_Parameter,
     Ast_Symbol_Procedure,
+    Ast_Symbol_Struct,
+    Ast_Symbol_Union,
+    Ast_Symbol_Enum,
     Ast_Symbol_Alias,
+    Ast_Symbol_Struct_Field,
+    Ast_Symbol_Enum_Value,
   };
 typedef enum AstSymbolTag AstSymbolTag;
 
@@ -108,7 +142,7 @@ struct AstExprUnaryOp
 typedef struct AstExprArrayAccess AstExprArrayAccess;
 struct AstExprArrayAccess
 {
-  AstExpr *base, *index;
+  AstExpr *lhs, *index;
 };
 
 typedef struct AstExprTypeInt AstExprTypeInt;
@@ -130,6 +164,13 @@ struct AstExprCall
 {
   AstExpr *lhs;
   LinkedList args;
+};
+
+typedef struct AstExprFieldAccess AstExprFieldAccess;
+struct AstExprFieldAccess
+{
+  AstExpr *lhs;
+  StringView name;
 };
 
 typedef struct AstExprCast2 AstExprCast2;
@@ -154,7 +195,11 @@ union AstExprData
   AstExprArrayAccess Array_Access;
   AstExprTypeInt Type_Int;
   AstExprTypeProc Type_Proc;
+  AstSymbolStruct Type_Struct;
+  AstSymbolStruct Type_Union;
+  AstSymbolEnum Type_Enum;
   AstExprCall Call;
+  AstExprFieldAccess Field_Access;
   AstExpr *Cast1;
   AstExprCast2 Cast2;
   u64 Int64;
@@ -172,7 +217,11 @@ enum AstExprTag
     Ast_Expr_Type_Bool,
     Ast_Expr_Type_Int,
     Ast_Expr_Type_Proc,
+    Ast_Expr_Type_Struct,
+    Ast_Expr_Type_Union,
+    Ast_Expr_Type_Enum,
     Ast_Expr_Call,
+    Ast_Expr_Field_Access,
     Ast_Expr_Cast1,
     Ast_Expr_Cast2,
     Ast_Expr_Int64,
@@ -190,19 +239,29 @@ struct AstExpr
   LineInfo line_info;
 };
 
+typedef struct AstStmt AstStmt;
+
 typedef struct AstStmtIf AstStmtIf;
 struct AstStmtIf
 {
   AstExpr *cond;
-  AstStmtBlock if_true, if_false;
+  AstStmt *if_true, *if_false;
 };
 
 typedef struct AstStmtWhile AstStmtWhile;
 struct AstStmtWhile
 {
   AstExpr *cond;
-  AstStmtBlock block;
+  AstStmt *block;
   bool is_do_while;
+};
+
+typedef struct AstStmtSwitch AstStmtSwitch;
+struct AstStmtSwitch
+{
+  AstExpr *cond;
+  AstStmtBlock cases;
+  AstStmt *default_case;
 };
 
 typedef struct AstStmtAssign AstStmtAssign;
@@ -218,6 +277,8 @@ union AstStmtData
   AstStmtIf If;
   AstStmtWhile While;
   AstExpr *Return_Expr;
+  AstStmtSwitch Switch;
+  AstExpr *Case;
   AstStmtAssign Assign;
   AstSymbol *Symbol;
   AstExpr *Expr;
@@ -232,13 +293,14 @@ enum AstStmtTag
     Ast_Stmt_Continue,
     Ast_Stmt_Return_Nothing,
     Ast_Stmt_Return_Expr,
+    Ast_Stmt_Switch,
+    Ast_Stmt_Case,
     Ast_Stmt_Assign,
     Ast_Stmt_Symbol,
     Ast_Stmt_Expr,
   };
 typedef enum AstStmtTag AstStmtTag;
 
-typedef struct AstStmt AstStmt;
 struct AstStmt
 {
   AstStmtTag tag;

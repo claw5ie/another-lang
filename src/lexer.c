@@ -47,8 +47,12 @@ enum TokenTag
     Token_Break,
     Token_Continue,
     Token_Return,
+    Token_Case,
 
     Token_Proc,
+    Token_Struct,
+    Token_Union,
+    Token_Enum,
     Token_Alias,
     Token_Cast,
 
@@ -185,6 +189,10 @@ buffer_token(Lexer *lexer)
         { .text = STRING_VIEW_FROM_CSTRING("continue"), .tag = Token_Continue  },
         { .text = STRING_VIEW_FROM_CSTRING("return"),   .tag = Token_Return    },
         { .text = STRING_VIEW_FROM_CSTRING("proc"),     .tag = Token_Proc      },
+        { .text = STRING_VIEW_FROM_CSTRING("case"),     .tag = Token_Case      },
+        { .text = STRING_VIEW_FROM_CSTRING("struct"),   .tag = Token_Struct    },
+        { .text = STRING_VIEW_FROM_CSTRING("union"),    .tag = Token_Union     },
+        { .text = STRING_VIEW_FROM_CSTRING("enum"),     .tag = Token_Enum      },
         { .text = STRING_VIEW_FROM_CSTRING("alias"),    .tag = Token_Alias     },
         { .text = STRING_VIEW_FROM_CSTRING("cast"),     .tag = Token_Cast      },
         { .text = STRING_VIEW_FROM_CSTRING("void"),     .tag = Token_Void_Type },
@@ -317,7 +325,11 @@ token_tag_to_string(TokenTag tag)
     case Token_Break:
     case Token_Continue:
     case Token_Return:
+    case Token_Case:
     case Token_Proc:
+    case Token_Struct:
+    case Token_Union:
+    case Token_Enum:
     case Token_Alias:
     case Token_Cast:
     case Token_Void_Type:

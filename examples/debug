@@ -1,21 +1,23 @@
-// Implement enums, onions, struct:
-// enum Bar
-// {
-//   Hello,
-//   World,
-// };
+// Prohibit symbol definition in single statement blocks, like:
+// if true a :: int = 42;
 
-// union Baz
-// {
-//   x :: i32,
-//   y :: i64,
-// };
+enum Bar
+{
+  Hello,
+  World,
+}
 
-// struct Foo
-// {
-//   x :: i32,
-//   y :: i64,
-// };
+union Baz
+{
+  x :: i32,
+  y :: i64,
+}
+
+struct Foo
+{
+  x :: i32,
+  y :: i64,
+}
 
 alias Foo = i32;
 alias Foo = proc() -> void;
@@ -31,6 +33,46 @@ proc foo(x :: bool, y :: i32) -> i32
 proc main(bool, i32)
 {
   alias foo = i32;
+
+  a :: Foo = _(x = 2);
+  a ::= Foo(x = 2);
+
+  Foo.Hello;
+  foo.hello;
+
+  if false
+  {
+    2 + 2;
+  }
+
+  if foo
+    {
+    case 0
+      if foo then
+      {
+      case 1
+      }
+    case 1
+      2 + 2;
+    case 0
+    case 1
+    }
+  else
+    {
+
+    }
+
+  if foo
+    {
+    case 0 then
+    case 1 do { } while false;
+    }
+  else
+    {
+      slfjslf;
+      jlsjfls;
+      lsjf;
+    }
 
   hello;
   2 + 2 * 2;

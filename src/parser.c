@@ -6,6 +6,10 @@ struct Parser
   Lexer lexer;
   Arena arena;
   AstExpr *exprs[EXPR_MAX_COUNT];
+  bool allow_loop_control_flow;
+  bool allow_case_stmt;
+  bool has_case_stmt;
+  bool had_error;
 };
 
 // Helps keep in sync 'parse_highest_prec_base' with 'parse_highest_prec'.
@@ -18,6 +22,9 @@ enum ExprStartTag
     Expr_Start_Unary_Reference,
     Expr_Start_Parenthesized,
     Expr_Start_Procedure_Type,
+    Expr_Start_Unnamed_Struct_Type,
+    Expr_Start_Unnamed_Union_Type,
+    Expr_Start_Unnamed_Enum_Type,
     Expr_Start_Cast,
     Expr_Start_Void_Type,
     Expr_Start_Bool_Type,
@@ -98,7 +105,12 @@ to_unary_op_tag(ExprStartTag op)
 }
 
 AstExpr *parse_expr(Parser *);
-void parse_procedure_header(Parser *, LinkedList *, AstType **);
+
+AstType *
+parse_type(Parser *p)
+{
+  return parse_expr(p);
+}
 
 LinkedList
 parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
@@ -147,6 +159,150 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
   return exprs;
 }
 
+void
+parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type)
+{
+  expect_token(&p->lexer, Token_Open_Paren);
+
+  TokenTag tt = peek_token(&p->lexer);
+  while (tt != Token_End_Of_File && tt != Token_Close_Paren)
+    {
+      Token param_id_token = grab_token(&p->lexer);
+      bool has_name = false;
+
+      if (peek_token(&p->lexer) == Token_Identifier
+          && peek_ahead_token(&p->lexer, 1) == Token_Double_Colon)
+        {
+          advance_many_tokens(&p->lexer, 2);
+          has_name = true;
+        }
+
+      AstType *type = parse_type(p);
+
+      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+      *symbol = (AstSymbol){
+        .tag = Ast_Symbol_Parameter,
+        .as = { .Parameter = {
+            .type = type,
+            .has_name = has_name,
+          } },
+        .name = param_id_token.text,
+        .line_info = param_id_token.line_info,
+      };
+      LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
+      LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
+      linked_list_insert_last(params, node);
+
+      tt = peek_token(&p->lexer);
+      if (tt != Token_End_Of_File && tt != Token_Close_Paren)
+        {
+          expect_token(&p->lexer, Token_Comma);
+          tt = peek_token(&p->lexer);
+        }
+    }
+
+  expect_token(&p->lexer, Token_Close_Paren);
+
+  if (peek_token(&p->lexer) == Token_Arrow)
+    {
+      advance_token(&p->lexer);
+      *return_type = parse_type(p);
+    }
+  else
+    {
+      AstType *type = parser_malloc(p, sizeof(*type));
+      *type = (AstType){
+        .tag = Ast_Expr_Type_Void,
+        .line_info = { 0 }, // What line info should I put here?
+      };
+      *return_type = type;
+    }
+}
+
+LinkedList
+parse_struct_fields(Parser *p)
+{
+  expect_token(&p->lexer, Token_Open_Curly);
+
+  LinkedList fields = { 0 };
+
+  // Should empty structs be allowed?
+  TokenTag tt = peek_token(&p->lexer);
+  while (tt != Token_End_Of_File && tt != Token_Close_Curly)
+    {
+      Token id_token = grab_token(&p->lexer);
+      expect_token(&p->lexer, Token_Identifier);
+      expect_token(&p->lexer, Token_Double_Colon);
+      AstType *type = parse_type(p);
+
+      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+      *symbol = (AstSymbol){
+        .tag = Ast_Symbol_Struct_Field,
+        .as = { .Struct_Field = {
+            .type = type,
+          } },
+        .name = id_token.text,
+        .line_info = id_token.line_info,
+      };
+
+      LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
+      LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
+      linked_list_insert_last(&fields, node);
+
+      tt = peek_token(&p->lexer);
+      if (tt != Token_End_Of_File && tt != Token_Close_Curly)
+        {
+          expect_token(&p->lexer, Token_Comma);
+          tt = peek_token(&p->lexer);
+        }
+    }
+
+  expect_token(&p->lexer, Token_Close_Curly);
+
+  return fields;
+}
+
+LinkedList
+parse_enum_values(Parser *p)
+{
+  expect_token(&p->lexer, Token_Open_Curly);
+
+  LinkedList fields = { 0 };
+
+  TokenTag tt = peek_token(&p->lexer);
+  do
+    {
+      Token id_token = grab_token(&p->lexer);
+      expect_token(&p->lexer, Token_Identifier);
+
+      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+      *symbol = (AstSymbol){
+        .tag = Ast_Symbol_Enum_Value,
+        .as = { .Enum_Value = {
+            .dummy = 42,
+          } },
+        .name = id_token.text,
+        .line_info = id_token.line_info,
+      };
+
+      LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
+      LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
+      linked_list_insert_last(&fields, node);
+
+      tt = peek_token(&p->lexer);
+      if (tt != Token_End_Of_File && tt != Token_Close_Curly)
+        {
+          expect_token(&p->lexer, Token_Comma);
+          tt = peek_token(&p->lexer);
+        }
+    }
+  while (tt != Token_End_Of_File && tt != Token_Close_Curly);
+
+  expect_token(&p->lexer, Token_Close_Curly);
+
+  return fields;
+}
+
 ExprStartTag
 can_token_start_expression(TokenTag tag)
 {
@@ -158,6 +314,9 @@ can_token_start_expression(TokenTag tag)
     case Token_Ref:         return Expr_Start_Unary_Reference;
     case Token_Open_Paren:  return Expr_Start_Parenthesized;
     case Token_Proc:        return Expr_Start_Procedure_Type;
+    case Token_Struct:      return Expr_Start_Unnamed_Struct_Type;
+    case Token_Union:       return Expr_Start_Unnamed_Union_Type;
+    case Token_Enum:        return Expr_Start_Unnamed_Enum_Type;
     case Token_Cast:        return Expr_Start_Cast;
     case Token_Void_Type:   return Expr_Start_Void_Type;
     case Token_Bool_Type:   return Expr_Start_Bool_Type;
@@ -269,6 +428,45 @@ parse_highest_prec_base(Parser *p)
           .as = { .Type_Proc = {
               .params = params,
               .return_type = return_type,
+            } },
+          .line_info = token.line_info,
+        };
+        return expr;
+      }
+    case Expr_Start_Unnamed_Struct_Type:
+      {
+        LinkedList fields = parse_struct_fields(p);
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Type_Struct,
+          .as = { .Type_Struct = {
+              .fields = fields,
+            } },
+          .line_info = token.line_info,
+        };
+        return expr;
+      }
+    case Expr_Start_Unnamed_Union_Type:
+      {
+        LinkedList fields = parse_struct_fields(p);
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Type_Union,
+          .as = { .Type_Union = {
+              .fields = fields,
+            } },
+          .line_info = token.line_info,
+        };
+        return expr;
+      }
+    case Expr_Start_Unnamed_Enum_Type:
+      {
+        LinkedList values = parse_enum_values(p);
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Type_Enum,
+          .as = { .Type_Enum = {
+              .values = values,
             } },
           .line_info = token.line_info,
         };
@@ -454,10 +652,30 @@ parse_highest_prec(Parser *p)
             *new_base = (AstExpr){
               .tag = Ast_Expr_Array_Access,
               .as = { .Array_Access = {
-                  .base = base,
+                  .lhs = base,
                   .index = expr,
                 } },
               .line_info = line_info,
+            };
+            base = new_base;
+          }
+
+          break;
+        case Token_Dot:
+          {
+            advance_token(&p->lexer);
+
+            Token token = grab_token(&p->lexer);
+            expect_token(&p->lexer, Token_Identifier);
+
+            AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
+            *new_base = (AstExpr){
+              .tag = Ast_Expr_Field_Access,
+              .as = { .Field_Access = {
+                  .lhs = base,
+                  .name = token.text,
+                } },
+              .line_info = token.line_info,
             };
             base = new_base;
           }
@@ -517,73 +735,7 @@ parse_expr(Parser *p)
   return parse_prec(p, LOWEST_PREC);
 }
 
-AstType *
-parse_type(Parser *p)
-{
-  return parse_expr(p);
-}
-
 AstStmtBlock parse_stmt_block(Parser *);
-
-void
-parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type)
-{
-  expect_token(&p->lexer, Token_Open_Paren);
-
-  TokenTag tt = peek_token(&p->lexer);
-  while (tt != Token_End_Of_File && tt != Token_Close_Paren)
-    {
-      Token param_id_token = grab_token(&p->lexer);
-      bool has_name = false;
-
-      if (peek_token(&p->lexer) == Token_Identifier
-          && peek_ahead_token(&p->lexer, 1) == Token_Double_Colon)
-        {
-          advance_many_tokens(&p->lexer, 2);
-          has_name = true;
-        }
-
-      AstType *type = parse_type(p);
-
-      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
-      *symbol = (AstSymbol){
-        .tag = Ast_Symbol_Parameter,
-        .as = { .Parameter = {
-            .type = type,
-            .has_name = has_name,
-          } },
-        .name = param_id_token.text,
-        .line_info = param_id_token.line_info,
-      };
-      LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
-      LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
-      linked_list_insert_last(params, node);
-
-      tt = peek_token(&p->lexer);
-      if (tt != Token_End_Of_File && tt != Token_Close_Paren)
-        {
-          expect_token(&p->lexer, Token_Comma);
-          tt = peek_token(&p->lexer);
-        }
-    }
-
-  expect_token(&p->lexer, Token_Close_Paren);
-
-  if (peek_token(&p->lexer) == Token_Arrow)
-    {
-      advance_token(&p->lexer);
-      *return_type = parse_type(p);
-    }
-  else
-    {
-      AstType *type = parser_malloc(p, sizeof(*type));
-      *type = (AstType){
-        .tag = Ast_Expr_Type_Void,
-        .line_info = { 0 }, // What line info should I put here?
-      };
-      *return_type = type;
-    }
-}
 
 AstSymbol *
 parse_symbol(Parser *p)
@@ -611,6 +763,66 @@ parse_symbol(Parser *p)
               .params = params,
               .return_type = return_type,
               .block = block,
+            } },
+          .name = id_token.text,
+          .line_info = id_token.line_info,
+        };
+
+        return symbol;
+      }
+    case Token_Struct:
+      {
+        advance_token(&p->lexer);
+
+        Token id_token = grab_token(&p->lexer);
+        expect_token(&p->lexer, Token_Identifier);
+        LinkedList fields = parse_struct_fields(p);
+
+        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        *symbol = (AstSymbol){
+          .tag = Ast_Symbol_Struct,
+          .as = { .Struct = {
+              .fields = fields,
+            } },
+          .name = id_token.text,
+          .line_info = id_token.line_info,
+        };
+
+        return symbol;
+      }
+    case Token_Union:
+      {
+        advance_token(&p->lexer);
+
+        Token id_token = grab_token(&p->lexer);
+        expect_token(&p->lexer, Token_Identifier);
+        LinkedList fields = parse_struct_fields(p);
+
+        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        *symbol = (AstSymbol){
+          .tag = Ast_Symbol_Union,
+          .as = { .Union = {
+              .fields = fields,
+            } },
+          .name = id_token.text,
+          .line_info = id_token.line_info,
+        };
+
+        return symbol;
+      }
+    case Token_Enum:
+      {
+        advance_token(&p->lexer);
+
+        Token id_token = grab_token(&p->lexer);
+        expect_token(&p->lexer, Token_Identifier);
+        LinkedList values = parse_enum_values(p);
+
+        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        *symbol = (AstSymbol){
+          .tag = Ast_Symbol_Enum,
+          .as = { .Enum = {
+              .values = values,
             } },
           .name = id_token.text,
           .line_info = id_token.line_info,
@@ -699,8 +911,6 @@ parse_symbol(Parser *p)
     }
 }
 
-AstStmtBlock parse_single_stmt_or_block(Parser *);
-
 AstStmt
 parse_stmt(Parser *p)
 {
@@ -724,22 +934,58 @@ parse_stmt(Parser *p)
         AstExpr *expr = parse_expr(p);
         if (peek_token(&p->lexer) == Token_Then)
           advance_token(&p->lexer);
-        AstStmtBlock if_true = parse_single_stmt_or_block(p);
-        AstStmtBlock if_false = { 0 };
+
+        bool old_allow_case_stmt = p->allow_case_stmt;
+        bool old_has_case_stmt = p->has_case_stmt;
+        p->allow_case_stmt = true;
+        p->has_case_stmt = false;
+
+        AstStmt *if_true = parser_malloc(p, sizeof(*if_true));
+        *if_true = parse_stmt(p);
+        bool is_switch = p->has_case_stmt;
+
+        p->allow_case_stmt = old_allow_case_stmt;
+        p->has_case_stmt = old_has_case_stmt;
+
+        AstStmt *if_false = NULL;
+
         if (peek_token(&p->lexer) == Token_Else)
           {
             advance_token(&p->lexer);
-            if_false = parse_single_stmt_or_block(p);
+            if_false = parser_malloc(p, sizeof(*if_false));
+            *if_false = parse_stmt(p);
           }
 
-        stmt.tag = Ast_Stmt_If;
-        stmt.as.If = (AstStmtIf){
-          .cond = expr,
-          .if_true = if_true,
-          .if_false = if_false,
-        };
+        if (!is_switch)
+          {
+            stmt.tag = Ast_Stmt_If;
+            stmt.as.If = (AstStmtIf){
+              .cond = expr,
+              .if_true = if_true,
+              .if_false = if_false,
+            };
+            return stmt;
+          }
+        else
+          {
+            // May not be initialized properly, but you shouldn't access content of statements anyway if error occured.
+            AstStmtBlock block = if_true->as.Block;
 
-        return stmt;
+            if (if_true->tag != Ast_Stmt_Block)
+              {
+                PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "switch case must be wrapped in curly braces ('{' and '}')");
+                p->had_error = true;
+              }
+
+            stmt.tag = Ast_Stmt_Switch;
+            stmt.as.Switch = (AstStmtSwitch){
+              .cond = expr,
+              .cases = block,
+              .default_case = if_false,
+            };
+
+            return stmt;
+          }
       }
     case Token_While:
       {
@@ -748,7 +994,17 @@ parse_stmt(Parser *p)
         AstExpr *expr = parse_expr(p);
         if (peek_token(&p->lexer) == Token_Do)
           advance_token(&p->lexer);
-        AstStmtBlock block = parse_single_stmt_or_block(p);
+
+        bool old_allow_loop_control_flow = p->allow_loop_control_flow;
+        bool old_allow_case_stmt = p->allow_case_stmt;
+        p->allow_loop_control_flow = true;
+        p->allow_case_stmt = false;
+
+        AstStmt *block = parser_malloc(p, sizeof(*block));
+        *block = parse_stmt(p);
+
+        p->allow_loop_control_flow = old_allow_loop_control_flow;
+        p->allow_case_stmt = old_allow_case_stmt;
 
         stmt.tag = Ast_Stmt_While;
         stmt.as.While = (AstStmtWhile){
@@ -763,7 +1019,17 @@ parse_stmt(Parser *p)
       {
         advance_token(&p->lexer);
 
-        AstStmtBlock block = parse_single_stmt_or_block(p);
+        bool old_allow_loop_control_flow = p->allow_loop_control_flow;
+        bool old_allow_case_stmt = p->allow_case_stmt;
+        p->allow_loop_control_flow = true;
+        p->allow_case_stmt = false;
+
+        AstStmt *block = parser_malloc(p, sizeof(*block));
+        *block = parse_stmt(p);
+
+        p->allow_loop_control_flow = old_allow_loop_control_flow;
+        p->allow_case_stmt = old_allow_case_stmt;
+
         expect_token(&p->lexer, Token_While);
         AstExpr *expr = parse_expr(p);
         expect_token(&p->lexer, Token_Semicolon);
@@ -778,11 +1044,23 @@ parse_stmt(Parser *p)
         return stmt;
       }
     case Token_Break:
+      if (!p->allow_loop_control_flow)
+        {
+          PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "'break' is not allowed outside of loop");
+          p->had_error = true;
+        }
+
       advance_token(&p->lexer);
       expect_token(&p->lexer, Token_Semicolon);
       stmt.tag = Ast_Stmt_Break;
       return stmt;
     case Token_Continue:
+      if (!p->allow_loop_control_flow)
+        {
+          PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "'continue' is not allowed outside of loop");
+          p->had_error = true;
+        }
+
       advance_token(&p->lexer);
       expect_token(&p->lexer, Token_Semicolon);
       stmt.tag = Ast_Stmt_Continue;
@@ -804,6 +1082,26 @@ parse_stmt(Parser *p)
         expect_token(&p->lexer, Token_Semicolon);
 
         stmt.tag = Ast_Stmt_Return_Nothing;
+
+        return stmt;
+      }
+    case Token_Case:
+      {
+        if (!p->allow_case_stmt)
+          {
+            PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "'case' is not allowed outside of 'if'");
+            p->had_error = true;
+          }
+
+        p->has_case_stmt = true;
+
+        advance_token(&p->lexer);
+        AstExpr *expr = parse_expr(p);
+        if (peek_token(&p->lexer) == Token_Then)
+          advance_token(&p->lexer);
+
+        stmt.tag = Ast_Stmt_Case;
+        stmt.as.Case = expr;
 
         return stmt;
       }
@@ -870,27 +1168,6 @@ parse_stmt_block(Parser *p)
   return block;
 }
 
-AstStmtBlock
-parse_single_stmt_or_block(Parser *p)
-{
-  switch (peek_token(&p->lexer))
-    {
-    case Token_Open_Curly:
-      return parse_stmt_block(p);
-    default:
-      {
-        AstStmtBlock block = { 0 };
-
-        AstStmt stmt = parse_stmt(p);
-        LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(stmt));
-        LINKED_LIST_PUT_NODE_DATA(AstStmt, node, stmt);
-        linked_list_insert_last(&block, node);
-
-        return block;
-      }
-    }
-}
-
 Ast
 parse(const char *filepath)
 {
@@ -907,6 +1184,10 @@ parse(const char *filepath)
       .filepath = filepath,
     },
     .arena = { 0 },
+    .allow_loop_control_flow = false,
+    .allow_case_stmt = false,
+    .has_case_stmt = false,
+    .had_error = false,
   };
 
   LinkedList symbols = { 0 };
@@ -929,6 +1210,9 @@ parse(const char *filepath)
     .symbols = symbols,
     .arena = parser.arena,
   };
+
+  if (parser.had_error)
+    exit(EXIT_FAILURE);
 
   return ast;
 }

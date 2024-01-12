@@ -39,7 +39,11 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Break:         return "Break";
     case Token_Continue:      return "Continue";
     case Token_Return:        return "Return";
+    case Token_Case:          return "Case";
     case Token_Proc:          return "Proc";
+    case Token_Struct:        return "Struct";
+    case Token_Union:         return "Union";
+    case Token_Enum:          return "Enum";
     case Token_Alias:         return "Alias";
     case Token_Cast:          return "Cast";
     case Token_Void_Type:     return "Void_Type";
