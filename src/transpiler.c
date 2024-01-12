@@ -13,37 +13,13 @@ void transpile_to_c_type(AstType *);
 void transpile_to_c_procedure_header(LinkedList *, AstType *);
 
 void
-transpile_to_c_expr_list(AstExprList *list)
+transpile_to_c_comma_separated_exprs(LinkedList *list)
 {
-  switch (list->tag)
+  for (LinkedListNode *node = list->first; node != NULL; node = node->next)
     {
-    case Ast_Expr_List_Expr:
-      transpile_to_c_expr(list->as.Expr);
-      break;
-    case Ast_Expr_List_Designator:
-      {
-        AstDesignator *Designator = &list->as.Designator;
-
-        printf("%.*s = ", FORMAT_STRING_VIEW(Designator->name));
-        transpile_to_c_expr(Designator->expr);
-      }
-
-      break;
-    case Ast_Expr_List_Sublist:
-      {
-        LinkedList *sublist = &list->as.Sublist;
-
-        PUTS("{ ");
-        for (LinkedListNode *node = sublist->first; node != NULL; node = node->next)
-          {
-            AstExprList *subsublist = &LINKED_LIST_GET_NODE_DATA(AstExprList, node);
-            transpile_to_c_expr_list(subsublist);
-            PUTS(", ");
-          }
-        PUTS("}");
-      }
-
-      break;
+      AstExpr *expr = LINKED_LIST_GET_NODE_DATA(AstExpr *, node);
+      transpile_to_c_expr(expr);
+      PUTS(", ");
     }
 }
 
@@ -155,6 +131,17 @@ transpile_to_c_expr(AstExpr *expr)
       }
 
       break;
+    case Ast_Expr_Call:
+      {
+        AstExprCall *Call = &expr->as.Call;
+
+        transpile_to_c_expr(Call->lhs);
+        PUTS("( ");
+        transpile_to_c_comma_separated_exprs(&Call->args);
+        PUTS(")");
+      }
+
+      break;
     case Ast_Expr_Cast1:
       {
         PUTS("(auto)");
@@ -191,11 +178,25 @@ transpile_to_c_expr(AstExpr *expr)
       break;
     case Ast_Expr_Expr_List:
       {
-        AstExprList *Expr_List = &expr->as.Expr_List;
+        LinkedList *Expr_List = &expr->as.Expr_List;
 
-        transpile_to_c_expr_list(Expr_List);
+        PUTS("{ ");
+        transpile_to_c_comma_separated_exprs(Expr_List);
+        PUTS("}");
       }
 
+      break;
+    case Ast_Expr_Designator:
+      {
+        AstExprDesignator *Designator = &expr->as.Designator;
+
+        printf("%.*s = ", FORMAT_STRING_VIEW(Designator->name));
+        transpile_to_c_expr(Designator->expr);
+      }
+
+      break;
+    case Ast_Expr_Null:
+      PUTS("NULL");
       break;
     case Ast_Expr_Identifier:
       {
@@ -204,9 +205,6 @@ transpile_to_c_expr(AstExpr *expr)
         printf("%.*s", FORMAT_STRING_VIEW(Identifier));
       }
 
-      break;
-    case Ast_Expr_Null:
-      PUTS("NULL");
       break;
     }
 }

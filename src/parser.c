@@ -101,68 +101,51 @@ to_unary_op_tag(ExprStartTag op)
 AstExpr *parse_expr(Parser *);
 void parse_procedure_header(Parser *, LinkedList *, AstType **);
 
-AstExprList
-parse_expr_list(Parser *p)
+LinkedList
+parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
 {
-  switch (peek_token(&p->lexer))
+  expect_token(&p->lexer, start_list);
+
+  LinkedList exprs = { 0 };
+
+  TokenTag tt = peek_token(&p->lexer);
+  while (tt != Token_End_Of_File && tt != end_list)
     {
-    case Token_Open_Curly:
-      {
-        advance_token(&p->lexer);
+      AstExpr *expr = NULL;
 
-        AstExprList list = {
-          .tag = Ast_Expr_List_Sublist,
-          .as = { .Sublist = { 0 } },
-        };
+      if (tt == Token_Identifier && peek_ahead_token(&p->lexer, 1) == Token_Equal)
+        {
+          Token token = grab_token(&p->lexer);
+          advance_many_tokens(&p->lexer, 2);
+          AstExpr *initializer = parse_expr(p);
+          expr = parser_malloc(p, sizeof(*expr));
+          *expr = (AstExpr){
+            .tag = Ast_Expr_Designator,
+            .as = { .Designator = {
+                .name = token.text,
+                .expr = initializer,
+              } },
+            .line_info = token.line_info,
+          };
+        }
+      else
+        expr = parse_expr(p);
 
-        TokenTag tt = peek_token(&p->lexer);
-        while (tt != Token_End_Of_File && tt != Token_Close_Curly)
-          {
-            AstExprList sublist = parse_expr_list(p);
-            LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(sublist));
-            LINKED_LIST_PUT_NODE_DATA(AstExprList, node, sublist);
-            linked_list_insert_last(&list.as.Sublist, node);
+      LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(expr));
+      LINKED_LIST_PUT_NODE_DATA(AstExpr *, node, expr);
+      linked_list_insert_last(&exprs, node);
 
-            tt = peek_token(&p->lexer);
-            if (tt != Token_End_Of_File && tt != Token_Close_Curly)
-              {
-                expect_token(&p->lexer, Token_Comma);
-                tt = peek_token(&p->lexer);
-              }
-          }
-
-        expect_token(&p->lexer, Token_Close_Curly);
-
-        return list;
-      }
-    case Token_Identifier:
-      {
-        if (peek_ahead_token(&p->lexer, 1) == Token_Equal)
-          {
-            Token token = grab_token(&p->lexer);
-            advance_many_tokens(&p->lexer, 2);
-            AstExpr *expr = parse_expr(p);
-            AstExprList list = {
-              .tag = Ast_Expr_List_Designator,
-              .as = { .Designator = {
-                  .name = token.text,
-                  .expr = expr,
-                } },
-            };
-            return list;
-          }
-      }
-      // fall through
-    default:
-      {
-        AstExpr *expr = parse_expr(p);
-        AstExprList list = {
-          .tag = Ast_Expr_List_Expr,
-          .as = { .Expr = expr },
-        };
-        return list;
-      }
+      tt = peek_token(&p->lexer);
+      if (tt != Token_End_Of_File && tt != end_list)
+        {
+          expect_token(&p->lexer, Token_Comma);
+          tt = peek_token(&p->lexer);
+        }
     }
+
+  expect_token(&p->lexer, end_list);
+
+  return exprs;
 }
 
 ExprStartTag
@@ -280,7 +263,7 @@ parse_highest_prec_base(Parser *p)
     case Expr_Start_Expression_List:
       {
         putback_token(&p->lexer, &token);
-        AstExprList expr_list = parse_expr_list(p);
+        LinkedList expr_list = parse_comma_separated_exprs(p, Token_Open_Curly, Token_Close_Curly);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Expr_List,
@@ -450,6 +433,23 @@ parse_highest_prec(Parser *p)
               .as = { .Unary_Op = {
                   .tag = Ast_Expr_Unary_Op_Deref,
                   .subexpr = base,
+                } },
+              .line_info = line_info,
+            };
+            base = new_base;
+          }
+
+          break;
+        case Token_Open_Paren:
+          {
+            LineInfo line_info = grab_token(&p->lexer).line_info;
+            LinkedList expr_list = parse_comma_separated_exprs(p, Token_Open_Paren, Token_Close_Paren);
+            AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
+            *new_base = (AstExpr){
+              .tag = Ast_Expr_Call,
+              .as = { .Call = {
+                  .lhs = base,
+                  .args = expr_list,
                 } },
               .line_info = line_info,
             };

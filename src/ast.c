@@ -125,6 +125,13 @@ struct AstExprTypeProc
   AstType *return_type;
 };
 
+typedef struct AstExprCall AstExprCall;
+struct AstExprCall
+{
+  AstExpr *lhs;
+  LinkedList args;
+};
+
 typedef struct AstExprCast2 AstExprCast2;
 struct AstExprCast2
 {
@@ -132,34 +139,11 @@ struct AstExprCast2
   AstExpr *expr;
 };
 
-typedef struct AstDesignator AstDesignator;
-struct AstDesignator
+typedef struct AstExprDesignator AstExprDesignator;
+struct AstExprDesignator
 {
   StringView name;
   AstExpr *expr;
-};
-
-typedef union AstExprListData AstExprListData;
-union AstExprListData
-{
-  AstExpr *Expr;
-  AstDesignator Designator;
-  LinkedList Sublist;
-};
-
-enum AstExprListTag
-  {
-    Ast_Expr_List_Expr,
-    Ast_Expr_List_Designator,
-    Ast_Expr_List_Sublist,
-  };
-typedef enum AstExprListTag AstExprListTag;
-
-typedef struct AstExprList AstExprList;
-struct AstExprList
-{
-  AstExprListTag tag;
-  AstExprListData as;
 };
 
 typedef union AstExprData AstExprData;
@@ -170,11 +154,13 @@ union AstExprData
   AstExprArrayAccess Array_Access;
   AstExprTypeInt Type_Int;
   AstExprTypeProc Type_Proc;
+  AstExprCall Call;
   AstExpr *Cast1;
   AstExprCast2 Cast2;
   u64 Int64;
   bool Bool;
-  AstExprList Expr_List;
+  LinkedList Expr_List;
+  AstExprDesignator Designator;
   StringView Identifier;
 };
 
@@ -187,13 +173,15 @@ enum AstExprTag
     Ast_Expr_Type_Bool,
     Ast_Expr_Type_Int,
     Ast_Expr_Type_Proc,
+    Ast_Expr_Call,
     Ast_Expr_Cast1,
     Ast_Expr_Cast2,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
     Ast_Expr_Expr_List,
-    Ast_Expr_Identifier,
+    Ast_Expr_Designator,
     Ast_Expr_Null,
+    Ast_Expr_Identifier,
   };
 typedef enum AstExprTag AstExprTag;
 

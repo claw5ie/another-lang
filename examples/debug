@@ -80,5 +80,11 @@ proc main(bool, i32)
   a :: proc(i32, hello :: bool);
   a :: proc(i32, hello :: bool) = null;
 
+  a = { hello = 42 };
+
+  a();
+  (bar)(name = 42);
+  (hello*)(2, 3, (4 - 4), { 2, 3 });
+
   return;
 }
