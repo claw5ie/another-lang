@@ -274,8 +274,8 @@ struct AstStmtSwitch
   AstStmt *default_case;
 };
 
-typedef struct AstStmtSwitchCase AstStmtSwitchCase;
-struct AstStmtSwitchCase
+typedef struct AstStmtCase AstStmtCase;
+struct AstStmtCase
 {
   AstExpr *expr;
   AstStmt *substmt;

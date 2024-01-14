@@ -1010,8 +1010,7 @@ parse_symbol(Parser *p)
 AstStmt
 parse_stmt(Parser *p)
 {
-  AstStmt stmt;
-  stmt.line_info = grab_token(&p->lexer).line_info;
+  LineInfo line_info = grab_token(&p->lexer).line_info;
 
   switch (peek_token(&p->lexer))
     {
@@ -1020,8 +1019,11 @@ parse_stmt(Parser *p)
         push_scope(p);
 
         AstStmtBlock block = parse_stmt_block(p);
-        stmt.tag = Ast_Stmt_Block;
-        stmt.as.Block = block;
+        AstStmt stmt = {
+          .tag = Ast_Stmt_Block,
+          .as = { .Block = block },
+          .line_info = line_info,
+        };
 
         pop_scope(p);
 
@@ -1047,11 +1049,14 @@ parse_stmt(Parser *p)
             *if_false = parse_stmt(p);
           }
 
-        stmt.tag = Ast_Stmt_If;
-        stmt.as.If = (AstStmtIf){
-          .cond = expr,
-          .if_true = if_true,
-          .if_false = if_false,
+        AstStmt stmt = {
+          .tag = Ast_Stmt_If,
+          .as = { .If = {
+              .cond = expr,
+              .if_true = if_true,
+              .if_false = if_false,
+            } },
+          .line_info = line_info,
         };
 
         return stmt;
@@ -1067,11 +1072,14 @@ parse_stmt(Parser *p)
         AstStmt *block = parser_malloc(p, sizeof(*block));
         *block = parse_stmt(p);
 
-        stmt.tag = Ast_Stmt_While;
-        stmt.as.While = (AstStmtWhile){
-          .cond = expr,
-          .block = block,
-          .is_do_while = false,
+        AstStmt stmt = {
+          .tag = Ast_Stmt_While,
+          .as = { .While = {
+              .cond = expr,
+              .block = block,
+              .is_do_while = false,
+            } },
+          .line_info = line_info,
         };
 
         return stmt;
@@ -1087,25 +1095,42 @@ parse_stmt(Parser *p)
         AstExpr *expr = parse_expr(p);
         expect_token(&p->lexer, Token_Semicolon);
 
-        stmt.tag = Ast_Stmt_While;
-        stmt.as.While = (AstStmtWhile){
-          .cond = expr,
-          .block = block,
-          .is_do_while = true,
+        AstStmt stmt = {
+          .tag = Ast_Stmt_While,
+          .as = { .While = {
+              .cond = expr,
+              .block = block,
+              .is_do_while = true,
+            } },
+          .line_info = line_info,
         };
 
         return stmt;
       }
     case Token_Break:
-      advance_token(&p->lexer);
-      expect_token(&p->lexer, Token_Semicolon);
-      stmt.tag = Ast_Stmt_Break;
-      return stmt;
+      {
+        advance_token(&p->lexer);
+        expect_token(&p->lexer, Token_Semicolon);
+
+        AstStmt stmt = {
+          .tag = Ast_Stmt_Break,
+          .line_info = line_info,
+        };
+
+        return stmt;
+      }
     case Token_Continue:
-      advance_token(&p->lexer);
-      expect_token(&p->lexer, Token_Semicolon);
-      stmt.tag = Ast_Stmt_Continue;
-      return stmt;
+      {
+        advance_token(&p->lexer);
+        expect_token(&p->lexer, Token_Semicolon);
+
+        AstStmt stmt = {
+          .tag = Ast_Stmt_Continue,
+          .line_info = line_info,
+        };
+
+        return stmt;
+      }
     case Token_Return:
       {
         advance_token(&p->lexer);
@@ -1114,15 +1139,21 @@ parse_stmt(Parser *p)
             AstExpr *expr = parse_expr(p);
             expect_token(&p->lexer, Token_Semicolon);
 
-            stmt.tag = Ast_Stmt_Return_Expr;
-            stmt.as.Return_Expr = expr;
+            AstStmt stmt = {
+              .tag = Ast_Stmt_Return_Expr,
+              .as = { .Return_Expr = expr },
+              .line_info = line_info,
+            };
 
             return stmt;
           }
 
         expect_token(&p->lexer, Token_Semicolon);
 
-        stmt.tag = Ast_Stmt_Return_Nothing;
+        AstStmt stmt = {
+          .tag = Ast_Stmt_Return_Nothing,
+          .line_info = line_info,
+        };
 
         return stmt;
       }
@@ -1136,10 +1167,13 @@ parse_stmt(Parser *p)
         AstStmtBlock block = parse_stmt_block(p);
         pop_scope(p);
 
-        stmt.tag = Ast_Stmt_Switch;
-        stmt.as.Switch = (AstStmtSwitch){
-          .cond = cond,
-          .cases = block,
+        AstStmt stmt = {
+          .tag = Ast_Stmt_Switch,
+          .as = { .Switch = {
+              .cond = cond,
+              .cases = block,
+            } },
+          .line_info = line_info,
         };
 
         return stmt;
@@ -1154,10 +1188,13 @@ parse_stmt(Parser *p)
         AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
         *substmt = parse_stmt(p);
 
-        stmt.tag = Ast_Stmt_Case;
-        stmt.as.Case = (AstStmtSwitchCase){
-          .expr = expr,
-          .substmt = substmt,
+        AstStmt stmt = {
+          .tag = Ast_Stmt_Case,
+          .as = { .Case = {
+              .expr = expr,
+              .substmt = substmt,
+            } },
+          .line_info = line_info,
         };
 
         return stmt;
@@ -1168,8 +1205,11 @@ parse_stmt(Parser *p)
         AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
         *substmt = parse_stmt(p);
 
-        stmt.tag = Ast_Stmt_Default;
-        stmt.as.Default = substmt;
+        AstStmt stmt = {
+          .tag = Ast_Stmt_Default,
+          .as = { .Default = substmt },
+          .line_info = line_info,
+        };
 
         return stmt;
       }
@@ -1179,8 +1219,12 @@ parse_stmt(Parser *p)
 
         if (symbol != NULL)
           {
-            stmt.tag = Ast_Stmt_Symbol;
-            stmt.as.Symbol = symbol;
+            AstStmt stmt = {
+              .tag = Ast_Stmt_Symbol,
+              .as = { .Symbol = symbol },
+              .line_info = line_info,
+            };
+
             return stmt;
           }
         else
@@ -1193,10 +1237,13 @@ parse_stmt(Parser *p)
                 AstExpr *rhs = parse_expr(p);
                 expect_token(&p->lexer, Token_Semicolon);
 
-                stmt.tag = Ast_Stmt_Assign;
-                stmt.as.Assign = (AstStmtAssign){
-                  .lhs = lhs,
-                  .rhs = rhs,
+                AstStmt stmt = {
+                  .tag = Ast_Stmt_Assign,
+                  .as = { .Assign = {
+                      .lhs = lhs,
+                      .rhs = rhs,
+                    } },
+                  .line_info = line_info,
                 };
 
                 return stmt;
@@ -1204,8 +1251,11 @@ parse_stmt(Parser *p)
 
             expect_token(&p->lexer, Token_Semicolon);
 
-            stmt.tag = Ast_Stmt_Expr;
-            stmt.as.Expr = lhs;
+            AstStmt stmt = {
+              .tag = Ast_Stmt_Expr,
+              .as = { .Expr = lhs },
+              .line_info = line_info,
+            };
 
             return stmt;
           }
