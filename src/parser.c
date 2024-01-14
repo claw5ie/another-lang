@@ -13,12 +13,6 @@ struct Parser
   ScopeId next_scope;
 
   AstExpr *exprs[MAX_EXPR_COUNT];
-
-  bool allow_loop_control_flow;
-  bool allow_case_stmt;
-  bool has_case_stmt;
-
-  bool had_error;
 };
 
 // Helps keep in sync 'parse_highest_prec_base' with 'parse_highest_prec'.
@@ -115,8 +109,7 @@ insert_symbol(Parser *p, Token *id_token)
     {
       PRINT_ERROR(p->lexer.filepath, id_token->line_info, "symbol '%.*s' is already defined", FORMAT_STRING_VIEW(symbol->name));
       PRINT_NOTE0(p->lexer.filepath, symbol->line_info, "first defined here");
-      symbol = parser_malloc(p, sizeof(*symbol)); // Provide fake symbol so that line info of first definition is not overwritten.
-      p->had_error = true;
+      exit(EXIT_FAILURE);
     }
 
   return symbol;
@@ -1039,23 +1032,14 @@ parse_stmt(Parser *p)
         advance_token(&p->lexer);
 
         AstExpr *expr = parse_expr(p);
+
         if (peek_token(&p->lexer) == Token_Then)
           advance_token(&p->lexer);
 
-        bool old_allow_case_stmt = p->allow_case_stmt;
-        bool old_has_case_stmt = p->has_case_stmt;
-        p->allow_case_stmt = true;
-        p->has_case_stmt = false;
-
         AstStmt *if_true = parser_malloc(p, sizeof(*if_true));
-        *if_true = parse_stmt(p);
-        bool is_switch = p->has_case_stmt;
-
-        p->allow_case_stmt = old_allow_case_stmt;
-        p->has_case_stmt = old_has_case_stmt;
-
         AstStmt *if_false = NULL;
 
+        *if_true = parse_stmt(p);
         if (peek_token(&p->lexer) == Token_Else)
           {
             advance_token(&p->lexer);
@@ -1063,36 +1047,14 @@ parse_stmt(Parser *p)
             *if_false = parse_stmt(p);
           }
 
-        if (!is_switch)
-          {
-            stmt.tag = Ast_Stmt_If;
-            stmt.as.If = (AstStmtIf){
-              .cond = expr,
-              .if_true = if_true,
-              .if_false = if_false,
-            };
-            return stmt;
-          }
-        else
-          {
-            // May not be initialized properly, but you shouldn't access content of statements anyway if error occured.
-            AstStmtBlock block = if_true->as.Block;
+        stmt.tag = Ast_Stmt_If;
+        stmt.as.If = (AstStmtIf){
+          .cond = expr,
+          .if_true = if_true,
+          .if_false = if_false,
+        };
 
-            if (if_true->tag != Ast_Stmt_Block)
-              {
-                PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "switch case must be wrapped in curly braces ('{' and '}')");
-                p->had_error = true;
-              }
-
-            stmt.tag = Ast_Stmt_Switch;
-            stmt.as.Switch = (AstStmtSwitch){
-              .cond = expr,
-              .cases = block,
-              .default_case = if_false,
-            };
-
-            return stmt;
-          }
+        return stmt;
       }
     case Token_While:
       {
@@ -1102,16 +1064,8 @@ parse_stmt(Parser *p)
         if (peek_token(&p->lexer) == Token_Do)
           advance_token(&p->lexer);
 
-        bool old_allow_loop_control_flow = p->allow_loop_control_flow;
-        bool old_allow_case_stmt = p->allow_case_stmt;
-        p->allow_loop_control_flow = true;
-        p->allow_case_stmt = false;
-
         AstStmt *block = parser_malloc(p, sizeof(*block));
         *block = parse_stmt(p);
-
-        p->allow_loop_control_flow = old_allow_loop_control_flow;
-        p->allow_case_stmt = old_allow_case_stmt;
 
         stmt.tag = Ast_Stmt_While;
         stmt.as.While = (AstStmtWhile){
@@ -1126,16 +1080,8 @@ parse_stmt(Parser *p)
       {
         advance_token(&p->lexer);
 
-        bool old_allow_loop_control_flow = p->allow_loop_control_flow;
-        bool old_allow_case_stmt = p->allow_case_stmt;
-        p->allow_loop_control_flow = true;
-        p->allow_case_stmt = false;
-
         AstStmt *block = parser_malloc(p, sizeof(*block));
         *block = parse_stmt(p);
-
-        p->allow_loop_control_flow = old_allow_loop_control_flow;
-        p->allow_case_stmt = old_allow_case_stmt;
 
         expect_token(&p->lexer, Token_While);
         AstExpr *expr = parse_expr(p);
@@ -1151,23 +1097,11 @@ parse_stmt(Parser *p)
         return stmt;
       }
     case Token_Break:
-      if (!p->allow_loop_control_flow)
-        {
-          PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "'break' is not allowed outside of loop");
-          p->had_error = true;
-        }
-
       advance_token(&p->lexer);
       expect_token(&p->lexer, Token_Semicolon);
       stmt.tag = Ast_Stmt_Break;
       return stmt;
     case Token_Continue:
-      if (!p->allow_loop_control_flow)
-        {
-          PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "'continue' is not allowed outside of loop");
-          p->had_error = true;
-        }
-
       advance_token(&p->lexer);
       expect_token(&p->lexer, Token_Semicolon);
       stmt.tag = Ast_Stmt_Continue;
@@ -1192,23 +1126,50 @@ parse_stmt(Parser *p)
 
         return stmt;
       }
+    case Token_Switch:
+      {
+        advance_token(&p->lexer);
+
+        AstExpr *cond = parse_expr(p);
+
+        push_scope(p);
+        AstStmtBlock block = parse_stmt_block(p);
+        pop_scope(p);
+
+        stmt.tag = Ast_Stmt_Switch;
+        stmt.as.Switch = (AstStmtSwitch){
+          .cond = cond,
+          .cases = block,
+        };
+
+        return stmt;
+      }
     case Token_Case:
       {
-        if (!p->allow_case_stmt)
-          {
-            PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "'case' is not allowed outside of 'if'");
-            p->had_error = true;
-          }
-
-        p->has_case_stmt = true;
-
         advance_token(&p->lexer);
         AstExpr *expr = parse_expr(p);
         if (peek_token(&p->lexer) == Token_Then)
           advance_token(&p->lexer);
 
+        AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
+        *substmt = parse_stmt(p);
+
         stmt.tag = Ast_Stmt_Case;
-        stmt.as.Case = expr;
+        stmt.as.Case = (AstStmtSwitchCase){
+          .expr = expr,
+          .substmt = substmt,
+        };
+
+        return stmt;
+      }
+    case Token_Default:
+      {
+        advance_token(&p->lexer);
+        AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
+        *substmt = parse_stmt(p);
+
+        stmt.tag = Ast_Stmt_Default;
+        stmt.as.Default = substmt;
 
         return stmt;
       }
@@ -1305,10 +1266,6 @@ parse(const char *filepath)
     .scopes = scopes,
     .scope_count = 0,
     .next_scope = 0,
-    .allow_loop_control_flow = false,
-    .allow_case_stmt = false,
-    .has_case_stmt = false,
-    .had_error = false,
   };
 
   LinkedList globals = { 0 };
@@ -1339,9 +1296,6 @@ parse(const char *filepath)
     .arena = parser.arena,
     .symbols = parser.symbols,
   };
-
-  if (parser.had_error)
-    exit(EXIT_FAILURE);
 
   return ast;
 }

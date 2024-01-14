@@ -274,6 +274,13 @@ struct AstStmtSwitch
   AstStmt *default_case;
 };
 
+typedef struct AstStmtSwitchCase AstStmtSwitchCase;
+struct AstStmtSwitchCase
+{
+  AstExpr *expr;
+  AstStmt *substmt;
+};
+
 typedef struct AstStmtAssign AstStmtAssign;
 struct AstStmtAssign
 {
@@ -288,7 +295,8 @@ union AstStmtData
   AstStmtWhile While;
   AstExpr *Return_Expr;
   AstStmtSwitch Switch;
-  AstExpr *Case;
+  AstStmtSwitchCase Case;
+  AstStmt *Default;
   AstStmtAssign Assign;
   AstSymbol *Symbol;
   AstExpr *Expr;
@@ -305,6 +313,7 @@ enum AstStmtTag
     Ast_Stmt_Return_Expr,
     Ast_Stmt_Switch,
     Ast_Stmt_Case,
+    Ast_Stmt_Default,
     Ast_Stmt_Assign,
     Ast_Stmt_Symbol,
     Ast_Stmt_Expr,

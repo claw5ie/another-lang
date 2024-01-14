@@ -499,27 +499,28 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
         PUTS("switch (");
         transpile_to_c_expr(Switch->cond, 0);
         PUTS(")\n");
-        put_spaces(ident);
-        PUTS("{\n");
-        transpile_to_c_stmt_list(Switch->cases, ident + TAB_SPACE);
-        if (Switch->default_case != NULL)
-          {
-            put_spaces(ident);
-            PUTS("default:\n");
-            transpile_to_c_stmt(Switch->default_case, ident + TAB_SPACE);
-            PUTS("\n");
-          }
-        put_spaces(ident);
-        PUTS("}\n");
+        transpile_to_c_stmt_block(Switch->cases, ident + TAB_SPACE);
+        // Default case is always null for now.
       }
 
       break;
     case Ast_Stmt_Case:
       {
+        AstStmtSwitchCase *Case = &stmt->as.Case;
+
         put_spaces(ident - (ident < TAB_SPACE ? 0 : TAB_SPACE));
         PUTS("case ");
-        transpile_to_c_expr(stmt->as.Case, 0);
-        PUTS(":");
+        transpile_to_c_expr(Case->expr, 0);
+        PUTS(":\n");
+        transpile_to_c_stmt(Case->substmt, ident);
+      }
+
+      break;
+    case Ast_Stmt_Default:
+      {
+        put_spaces(ident - (ident < TAB_SPACE ? 0 : TAB_SPACE));
+        PUTS("default:\n");
+        transpile_to_c_stmt(stmt->as.Default, ident);
       }
 
       break;

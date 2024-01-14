@@ -49,33 +49,30 @@ proc main(bool, i32)
     2 + 2;
   }
 
-  if foo
-    {
-    case 0
-      if foo then
-      {
-      case 1
-      }
-    case 1
-      2 + 2;
-    case 0
-    case 1
-    }
-  else
-    {
-
-    }
-
-  if foo
+  switch true
     {
     case 0 then
-    case 1 do { } while false;
+      {
+        2 + 2;
+      }
+    default 42;
     }
-  else
+
+  switch true
     {
-      slfjslf;
-      jlsjfls;
-      lsjf;
+    }
+
+  switch true
+    {
+    default 42;
+    }
+
+  switch true
+    {
+    case 0
+    case 1
+    case 2 then { }
+    default 42;
     }
 
   hello;

@@ -39,7 +39,9 @@ debug_token_tag_to_string(TokenTag tag)
     case Token_Break:         return "Break";
     case Token_Continue:      return "Continue";
     case Token_Return:        return "Return";
+    case Token_Switch:        return "Switch";
     case Token_Case:          return "Case";
+    case Token_Default:       return "Default";
     case Token_Proc:          return "Proc";
     case Token_Struct:        return "Struct";
     case Token_Union:         return "Union";
