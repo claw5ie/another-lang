@@ -9,7 +9,7 @@ struct StringView
 #define FORMAT_STRING_VIEW(view) (int)(view).count, (view).data
 
 bool
-are_string_views_equal(StringView v0, StringView v1)
+are_views_equal(StringView v0, StringView v1)
 {
   return v0.count == v1.count && memcmp(v0.data, v1.data, v0.count) == 0;
 }
@@ -120,4 +120,107 @@ arena_malloc(Arena *arena, size_t size)
   block->size += size;
 
   return ptr;
+}
+
+typedef size_t (*HashTableKeyHashFunc)(void *key);
+typedef bool (*HashTableAreKeysEqualFunc)(void *key0, void *key1);
+
+typedef struct HashTableNode HashTableNode;
+struct HashTableNode
+{
+  void *key;
+  void *data;
+  HashTableNode *next;
+  size_t hash;
+};
+
+typedef struct HashTable HashTable;
+struct HashTable
+{
+  HashTableNode **data;
+  size_t count, capacity;
+  size_t key_size, data_size;
+  HashTableKeyHashFunc key_hash;
+  HashTableAreKeysEqualFunc are_keys_equal;
+};
+
+void
+hash_table_maybe_expand(HashTable *t)
+{
+  if (t->capacity == 0 || (double)t->count / t->capacity > 0.75)
+    {
+      // 'NULL' is not guaranteed to be 0, I think, so can't calloc??
+      size_t new_capacity = 2 * (t->capacity + 1);
+      HashTableNode **new_data = calloc(new_capacity, sizeof(*new_data));
+      if (new_data == NULL)
+        abort();
+
+      for (size_t i = t->capacity; i-- > 0; )
+        {
+          HashTableNode *node = t->data[i];
+          while (node != NULL)
+            {
+              size_t index = node->hash % new_capacity;
+
+              HashTableNode *next = node->next;
+              node->next = new_data[index];
+              new_data[index] = node;
+
+              node = next;
+            }
+        }
+
+      free(t->data);
+      t->data = new_data;
+      t->capacity = new_capacity;
+    }
+}
+
+void *
+hash_table_find(HashTable *t, void *key)
+{
+  if (t->capacity > 0)
+    {
+      HashTableNode *node = t->data[t->key_hash(key) % t->capacity];
+      for (; node != NULL; node = node->next)
+        if (t->are_keys_equal(node->key, key))
+          return node->data;
+    }
+
+  return NULL;
+}
+
+void *
+hash_table_insert(HashTable *t, void *key, bool *was_inserted)
+{
+  assert(sizeof(HashTableNode) % sizeof(void *) == 0
+         && t->key_size % sizeof(void *) == 0);
+
+  *was_inserted = false;
+
+  {
+    void *data = hash_table_find(t, key);
+    if (data != NULL)
+      return data;
+  }
+
+  hash_table_maybe_expand(t);
+
+  size_t hash = t->key_hash(key);
+  size_t index = hash % t->capacity;
+  HashTableNode *node = malloc(sizeof(*node) + t->key_size + t->data_size);
+  if (node == NULL)
+    abort();
+  node->key = (char *)node + sizeof(*node);
+  node->data = (char *)node->key + t->key_size;
+  node->hash = hash;
+  node->next = t->data[index];
+  t->data[index] = node;
+  ++t->count;
+
+  memcpy(node->key, key, t->key_size);
+
+  *was_inserted = true;
+
+  return node->data;
 }

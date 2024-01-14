@@ -570,7 +570,7 @@ transpile_to_c_stmt_block(AstStmtBlock block, size_t ident)
 void
 transpile_to_c(Ast *ast)
 {
-  for (LinkedListNode *node = ast->symbols.first; node != NULL; node = node->next)
+  for (LinkedListNode *node = ast->globals.first; node != NULL; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       transpile_to_c_symbol(symbol, 0);

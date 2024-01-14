@@ -13,14 +13,14 @@ union Baz
   y :: i64,
 }
 
-struct Foo
+struct Faz
 {
   x :: i32,
   y :: i64,
 }
 
 alias Foo = i32;
-alias Foo = proc() -> void;
+alias Poo = proc() -> void;
 
 proc foo(x :: bool, y :: i32) -> i32
 {
@@ -35,10 +35,10 @@ proc main(bool, i32)
   alias foo = i32;
 
   a :: Foo = _(x = 2);
-  a ::= Foo(x = 2);
+  b ::= Foo(x = 2);
 
-  a :: struct{ x :: int };
-  a :: enum{ x };
+  c :: struct{ x :: int };
+  d :: enum{ x };
   alias Foo = union{ x :: 42 };
 
   Foo.Hello;
@@ -109,24 +109,24 @@ proc main(bool, i32)
    { }
   while true;
 
-  a :: int = 42;
-  a :: i32 = 42;
-  a :: i42 = 42;
-  a = 69;
-  b ::= false;
+  e :: int = 42;
+  f :: i32 = 42;
+  g :: i42 = 42;
+  h = 69;
+  p ::= false;
 
-  a :: i42 = 42;
-  b :: i42* = &a;
-  c :: i42 = b**;
+  i :: i42 = 42;
+  j :: i42* = &a;
+  k :: i42 = b**;
 
-  a :: i32[3] = _(42, _(42), 90);
+  l :: i32[3] = _(42, _(42), 90);
 
   a[2][42] = 42;
 
-  a :: proc(i32, hello :: bool);
-  a :: proc(i32, hello :: bool) = null;
+  m :: proc(i32, hello :: bool);
+  n :: proc(i32, hello :: bool) = null;
 
-  a = _(hello = 42);
+  o = _(hello = 42);
 
   a();
   (bar)(name = 42);

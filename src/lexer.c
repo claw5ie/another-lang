@@ -1,5 +1,6 @@
 #define PRINT_ERROR0(filepath, line_info, message) fprintf(stderr, "%s:%zu:%zu: error: " message "\n", filepath, (line_info).line, (line_info).column)
 #define PRINT_ERROR(filepath, line_info, message, ...) fprintf(stderr, "%s:%zu:%zu: error: " message "\n", filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
+#define PRINT_NOTE0(filepath, line_info, message) fprintf(stderr, "%s:%zu:%zu: note: " message "\n", filepath, (line_info).line, (line_info).column)
 
 typedef struct LineInfo LineInfo;
 struct LineInfo
@@ -205,7 +206,7 @@ buffer_token(Lexer *lexer)
       for (size_t i = 0; i < ARRAY_COUNT(keywords); i++)
         {
           const Keyword *keyword = &keywords[i];
-          if (are_string_views_equal(keyword->text, token.text))
+          if (are_views_equal(keyword->text, token.text))
             {
               token.tag = keyword->tag;
               break;

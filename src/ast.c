@@ -1,13 +1,23 @@
 typedef struct Ast Ast;
 struct Ast
 {
-  LinkedList symbols;
+  LinkedList globals;
   Arena arena;
+  HashTable symbols;
 };
 
 typedef struct AstExpr AstExpr;
 typedef AstExpr AstType;
 typedef LinkedList AstStmtBlock;
+
+typedef u32 ScopeId;
+
+typedef struct AstSymbolKey AstSymbolKey;
+struct AstSymbolKey
+{
+  StringView name;
+  ScopeId scope;
+};
 
 typedef struct AstSymbolVariable AstSymbolVariable;
 struct AstSymbolVariable

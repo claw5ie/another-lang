@@ -1,14 +1,23 @@
-#define EXPR_MAX_COUNT 2
+#define MAX_EXPR_COUNT 2
+#define MAX_SCOPE_COUNT 256
 
 typedef struct Parser Parser;
 struct Parser
 {
   Lexer lexer;
   Arena arena;
-  AstExpr *exprs[EXPR_MAX_COUNT];
+  HashTable symbols;
+
+  ScopeId *scopes;
+  size_t scope_count;
+  ScopeId next_scope;
+
+  AstExpr *exprs[MAX_EXPR_COUNT];
+
   bool allow_loop_control_flow;
   bool allow_case_stmt;
   bool has_case_stmt;
+
   bool had_error;
 };
 
@@ -39,6 +48,50 @@ typedef enum ExprStartTag ExprStartTag;
 
 #define LOWEST_PREC (INT_MIN + 1)
 
+size_t
+symbol_hash(void *key)
+{
+  AstSymbolKey *k = key;
+  size_t hash0 = murmur2_hash(k->name.data, k->name.count);
+  size_t hash1 = murmur2_hash(&k->scope, sizeof(k->scope));
+  return hash0 + 33 * hash1;
+}
+
+bool
+are_symbols_equal(void *key0, void *key1)
+{
+  AstSymbolKey *k0 = key0;
+  AstSymbolKey *k1 = key1;
+  return k0->scope == k1->scope && are_views_equal(k0->name, k1->name);
+}
+
+void
+push_scope(Parser *p)
+{
+  if (p->scope_count >= MAX_SCOPE_COUNT)
+    {
+      // Line info may not be accurate if the last token in buffer doesn't begin the scope.
+      PRINT_ERROR(p->lexer.filepath, p->lexer.line_info, "reached limit of scopes: %i", MAX_SCOPE_COUNT);
+      exit(EXIT_FAILURE);
+    }
+
+  p->scopes[p->scope_count++] = p->next_scope++;
+}
+
+ScopeId
+grab_current_scope(Parser *p)
+{
+  assert(p->scope_count > 0);
+  return p->scopes[p->scope_count - 1];
+}
+
+void
+pop_scope(Parser *p)
+{
+  assert(p->scope_count > 0);
+  --p->scope_count;
+}
+
 void *
 parser_malloc(Parser *p, size_t size)
 {
@@ -46,6 +99,27 @@ parser_malloc(Parser *p, size_t size)
   if (data == NULL)
     abort();
   return data;
+}
+
+AstSymbol *
+insert_symbol(Parser *p, Token *id_token)
+{
+  AstSymbolKey key = {
+    .name = id_token->text,
+    .scope = grab_current_scope(p),
+  };
+  bool was_inserted = false;
+  AstSymbol *symbol = hash_table_insert(&p->symbols, &key, &was_inserted);
+
+  if (!was_inserted)
+    {
+      PRINT_ERROR(p->lexer.filepath, id_token->line_info, "symbol '%.*s' is already defined", FORMAT_STRING_VIEW(symbol->name));
+      PRINT_NOTE0(p->lexer.filepath, symbol->line_info, "first defined here");
+      symbol = parser_malloc(p, sizeof(*symbol)); // Provide fake symbol so that line info of first definition is not overwritten.
+      p->had_error = true;
+    }
+
+  return symbol;
 }
 
 int
@@ -160,7 +234,7 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
 }
 
 void
-parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type)
+parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type, bool insert_params_into_table)
 {
   expect_token(&p->lexer, Token_Open_Paren);
 
@@ -178,17 +252,35 @@ parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type)
         }
 
       AstType *type = parse_type(p);
+      AstSymbol *symbol = NULL;
 
-      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
-      *symbol = (AstSymbol){
-        .tag = Ast_Symbol_Parameter,
-        .as = { .Parameter = {
-            .type = type,
-            .has_name = has_name,
-          } },
-        .name = param_id_token.text,
-        .line_info = param_id_token.line_info,
-      };
+      if (insert_params_into_table && has_name)
+        {
+          symbol = insert_symbol(p, &param_id_token);
+          *symbol = (AstSymbol){
+            .tag = Ast_Symbol_Parameter,
+            .as = { .Parameter = {
+                .type = type,
+                .has_name = has_name,
+              } },
+            .name = param_id_token.text,
+            .line_info = param_id_token.line_info,
+          };
+        }
+      else
+        {
+          symbol = parser_malloc(p, sizeof(*symbol));
+          *symbol = (AstSymbol){
+            .tag = Ast_Symbol_Parameter,
+            .as = { .Parameter = {
+                .type = type,
+                .has_name = has_name,
+              } },
+            .name = { 0 },
+            .line_info = param_id_token.line_info,
+          };
+        }
+
       LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
       linked_list_insert_last(params, node);
@@ -226,6 +318,8 @@ parse_struct_fields(Parser *p)
 
   LinkedList fields = { 0 };
 
+  push_scope(p);
+
   // Should empty structs be allowed?
   TokenTag tt = peek_token(&p->lexer);
   while (tt != Token_End_Of_File && tt != Token_Close_Curly)
@@ -235,7 +329,7 @@ parse_struct_fields(Parser *p)
       expect_token(&p->lexer, Token_Double_Colon);
       AstType *type = parse_type(p);
 
-      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+      AstSymbol *symbol = insert_symbol(p, &id_token);
       *symbol = (AstSymbol){
         .tag = Ast_Symbol_Struct_Field,
         .as = { .Struct_Field = {
@@ -257,6 +351,8 @@ parse_struct_fields(Parser *p)
         }
     }
 
+  pop_scope(p);
+
   expect_token(&p->lexer, Token_Close_Curly);
 
   return fields;
@@ -269,13 +365,15 @@ parse_enum_values(Parser *p)
 
   LinkedList fields = { 0 };
 
+  push_scope(p);
+
   TokenTag tt = peek_token(&p->lexer);
   do
     {
       Token id_token = grab_token(&p->lexer);
       expect_token(&p->lexer, Token_Identifier);
 
-      AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+      AstSymbol *symbol = insert_symbol(p, &id_token);
       *symbol = (AstSymbol){
         .tag = Ast_Symbol_Enum_Value,
         .as = { .Enum_Value = {
@@ -297,6 +395,8 @@ parse_enum_values(Parser *p)
         }
     }
   while (tt != Token_End_Of_File && tt != Token_Close_Curly);
+
+  pop_scope(p);
 
   expect_token(&p->lexer, Token_Close_Curly);
 
@@ -341,7 +441,7 @@ parse_fixed_size_arg_list(Parser *p)
     {
       AstExpr *expr = parse_expr(p);
 
-      if (count < EXPR_MAX_COUNT)
+      if (count < MAX_EXPR_COUNT)
         p->exprs[count] = expr;
 
       tt = peek_token(&p->lexer);
@@ -421,7 +521,7 @@ parse_highest_prec_base(Parser *p)
       {
         LinkedList params = { 0 };
         AstType *return_type = NULL;
-        parse_procedure_header(p, &params, &return_type);
+        parse_procedure_header(p, &params, &return_type, false);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type_Proc,
@@ -503,6 +603,7 @@ parse_highest_prec_base(Parser *p)
             }
           default:
             {
+              // Don't actually need to exit here? But need to return something.
               PRINT_ERROR(p->lexer.filepath, token.line_info, "expected 1 or 2 arguments, not %zu", count);
               exit(EXIT_FAILURE);
             }
@@ -747,16 +848,18 @@ parse_symbol(Parser *p)
         advance_token(&p->lexer);
 
         Token id_token = grab_token(&p->lexer);
-
         expect_token(&p->lexer, Token_Identifier);
+
+        push_scope(p);
 
         LinkedList params = { 0 };
         AstType *return_type = NULL;
-        parse_procedure_header(p, &params, &return_type);
-
+        parse_procedure_header(p, &params, &return_type, true);
         AstStmtBlock block = parse_stmt_block(p);
 
-        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        pop_scope(p);
+
+        AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Procedure,
           .as = { .Procedure = {
@@ -778,7 +881,7 @@ parse_symbol(Parser *p)
         expect_token(&p->lexer, Token_Identifier);
         LinkedList fields = parse_struct_fields(p);
 
-        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Struct,
           .as = { .Struct = {
@@ -798,7 +901,7 @@ parse_symbol(Parser *p)
         expect_token(&p->lexer, Token_Identifier);
         LinkedList fields = parse_struct_fields(p);
 
-        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Union,
           .as = { .Union = {
@@ -818,7 +921,7 @@ parse_symbol(Parser *p)
         expect_token(&p->lexer, Token_Identifier);
         LinkedList values = parse_enum_values(p);
 
-        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Enum,
           .as = { .Enum = {
@@ -840,7 +943,7 @@ parse_symbol(Parser *p)
         AstType *type = parse_type(p);
         expect_token(&p->lexer, Token_Semicolon);
 
-        AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+        AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Alias,
           .as = { .Alias = {
@@ -867,7 +970,7 @@ parse_symbol(Parser *p)
                 advance_token(&p->lexer);
                 expr = parse_expr(p);
               }
-            AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+            AstSymbol *symbol = insert_symbol(p, &id_token);
             *symbol = (AstSymbol){
               .tag = Ast_Symbol_Variable,
               .as = { .Variable = {
@@ -888,7 +991,7 @@ parse_symbol(Parser *p)
             advance_many_tokens(&p->lexer, 2);
 
             AstExpr *expr = parse_expr(p);
-            AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+            AstSymbol *symbol = insert_symbol(p, &id_token);
             *symbol = (AstSymbol){
               .tag = Ast_Symbol_Variable,
               .as = { .Variable = {
@@ -921,9 +1024,13 @@ parse_stmt(Parser *p)
     {
     case Token_Open_Curly:
       {
+        push_scope(p);
+
         AstStmtBlock block = parse_stmt_block(p);
         stmt.tag = Ast_Stmt_Block;
         stmt.as.Block = block;
+
+        pop_scope(p);
 
         return stmt;
       }
@@ -1174,6 +1281,11 @@ parse(const char *filepath)
   size_t source_code_size = 0;
   char *source_code = read_entire_file(filepath, &source_code_size);
 
+  // Could be a global variable or static one.
+  ScopeId *scopes = malloc(MAX_SCOPE_COUNT * sizeof(*scopes));
+  if (scopes == NULL)
+    abort();
+
   Parser parser = {
     .lexer = {
       .token_start = 0,
@@ -1184,13 +1296,24 @@ parse(const char *filepath)
       .filepath = filepath,
     },
     .arena = { 0 },
+    .symbols = {
+      .key_size = sizeof(AstSymbolKey),
+      .data_size = sizeof(AstSymbol),
+      .key_hash = symbol_hash,
+      .are_keys_equal = are_symbols_equal,
+    },
+    .scopes = scopes,
+    .scope_count = 0,
+    .next_scope = 0,
     .allow_loop_control_flow = false,
     .allow_case_stmt = false,
     .has_case_stmt = false,
     .had_error = false,
   };
 
-  LinkedList symbols = { 0 };
+  LinkedList globals = { 0 };
+
+  push_scope(&parser);
 
   while (peek_token(&parser.lexer) != Token_End_Of_File)
     {
@@ -1203,12 +1326,18 @@ parse(const char *filepath)
         }
       LinkedListNode *node = parser_malloc(&parser, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
-      linked_list_insert_last(&symbols, node);
+      linked_list_insert_last(&globals, node);
     }
 
+  pop_scope(&parser);
+  assert(parser.scope_count == 0);
+
+  free(scopes);
+
   Ast ast = {
-    .symbols = symbols,
+    .globals = globals,
     .arena = parser.arena,
+    .symbols = parser.symbols,
   };
 
   if (parser.had_error)
