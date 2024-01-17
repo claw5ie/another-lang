@@ -506,7 +506,7 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
       break;
     case Ast_Stmt_Case:
       {
-        AstStmtSwitchCase *Case = &stmt->as.Case;
+        AstStmtCase *Case = &stmt->as.Case;
 
         put_spaces(ident - (ident < TAB_SPACE ? 0 : TAB_SPACE));
         PUTS("case ");

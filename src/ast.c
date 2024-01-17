@@ -295,7 +295,7 @@ union AstStmtData
   AstStmtWhile While;
   AstExpr *Return_Expr;
   AstStmtSwitch Switch;
-  AstStmtSwitchCase Case;
+  AstStmtCase Case;
   AstStmt *Default;
   AstStmtAssign Assign;
   AstSymbol *Symbol;
