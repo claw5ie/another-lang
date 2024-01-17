@@ -173,7 +173,7 @@ to_unary_op_tag(ExprStartTag op)
 
 AstExpr *parse_expr(Parser *);
 
-AstType *
+AstExpr *
 parse_type(Parser *p)
 {
   return parse_expr(p);
@@ -227,7 +227,7 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
 }
 
 void
-parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type, bool insert_params_into_table)
+parse_procedure_header(Parser *p, LinkedList *params, AstExpr **return_type, bool insert_params_into_table)
 {
   expect_token(&p->lexer, Token_Open_Paren);
 
@@ -244,7 +244,7 @@ parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type, boo
           has_name = true;
         }
 
-      AstType *type = parse_type(p);
+      AstExpr *type = parse_type(p);
       AstSymbol *symbol = NULL;
 
       if (insert_params_into_table && has_name)
@@ -295,9 +295,12 @@ parse_procedure_header(Parser *p, LinkedList *params, AstType **return_type, boo
     }
   else
     {
-      AstType *type = parser_malloc(p, sizeof(*type));
-      *type = (AstType){
-        .tag = Ast_Expr_Type_Void,
+      AstExpr *type = parser_malloc(p, sizeof(*type));
+      *type = (AstExpr){
+        .tag = Ast_Expr_Type,
+        .as = { .Type = {
+            .tag = Ast_Expr_Type_Void,
+          } },
         .line_info = { 0 }, // What line info should I put here?
       };
       *return_type = type;
@@ -320,7 +323,7 @@ parse_struct_fields(Parser *p)
       Token id_token = grab_token(&p->lexer);
       expect_token(&p->lexer, Token_Identifier);
       expect_token(&p->lexer, Token_Double_Colon);
-      AstType *type = parse_type(p);
+      AstExpr *type = parse_type(p);
 
       AstSymbol *symbol = insert_symbol(p, &id_token);
       *symbol = (AstSymbol){
@@ -513,15 +516,17 @@ parse_highest_prec_base(Parser *p)
     case Expr_Start_Procedure_Type:
       {
         LinkedList params = { 0 };
-        AstType *return_type = NULL;
+        AstExpr *return_type = NULL;
         parse_procedure_header(p, &params, &return_type, false);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Type_Proc,
-          .as = { .Type_Proc = {
-              .params = params,
-              .return_type = return_type,
-            } },
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Proc,
+              .as = { .Proc = {
+                  .params = params,
+                  .return_type = return_type,
+                } } } },
           .line_info = token.line_info,
         };
         return expr;
@@ -531,10 +536,12 @@ parse_highest_prec_base(Parser *p)
         LinkedList fields = parse_struct_fields(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Type_Struct,
-          .as = { .Type_Struct = {
-              .fields = fields,
-            } },
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Struct,
+              .as = { .Struct = {
+                  .fields = fields,
+                } } } },
           .line_info = token.line_info,
         };
         return expr;
@@ -544,10 +551,12 @@ parse_highest_prec_base(Parser *p)
         LinkedList fields = parse_struct_fields(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Type_Union,
-          .as = { .Type_Union = {
-              .fields = fields,
-            } },
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Union,
+              .as = { .Union = {
+                  .fields = fields,
+                } } } },
           .line_info = token.line_info,
         };
         return expr;
@@ -557,10 +566,12 @@ parse_highest_prec_base(Parser *p)
         LinkedList values = parse_enum_values(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Type_Enum,
-          .as = { .Type_Enum = {
-              .values = values,
-            } },
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Enum,
+              .as = { .Enum = {
+                  .values = values,
+                } } } },
           .line_info = token.line_info,
         };
         return expr;
@@ -606,7 +617,10 @@ parse_highest_prec_base(Parser *p)
       {
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Type_Void,
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Void,
+            } },
           .line_info = token.line_info,
         };
         return expr;
@@ -615,7 +629,10 @@ parse_highest_prec_base(Parser *p)
       {
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Type_Bool,
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Bool,
+            } },
           .line_info = token.line_info,
         };
         return expr;
@@ -631,11 +648,13 @@ parse_highest_prec_base(Parser *p)
 
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Type_Int,
-          .as = { .Type_Int = {
-              .bits = bits,
-              .is_signed = is_signed,
-            } },
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Int,
+              .as = { .Int = {
+                  .bits = bits,
+                  .is_signed = is_signed,
+                } } } },
           .line_info = token.line_info,
         };
 
@@ -846,7 +865,7 @@ parse_symbol(Parser *p)
         push_scope(p);
 
         LinkedList params = { 0 };
-        AstType *return_type = NULL;
+        AstExpr *return_type = NULL;
         parse_procedure_header(p, &params, &return_type, true);
         AstStmtBlock block = parse_stmt_block(p);
 
@@ -933,7 +952,7 @@ parse_symbol(Parser *p)
         Token id_token = grab_token(&p->lexer);
         expect_token(&p->lexer, Token_Identifier);
         expect_token(&p->lexer, Token_Equal);
-        AstType *type = parse_type(p);
+        AstExpr *type = parse_type(p);
         expect_token(&p->lexer, Token_Semicolon);
 
         AstSymbol *symbol = insert_symbol(p, &id_token);
@@ -956,7 +975,7 @@ parse_symbol(Parser *p)
             Token id_token = grab_token(&p->lexer);
             advance_many_tokens(&p->lexer, 2);
 
-            AstType *type = parse_type(p);
+            AstExpr *type = parse_type(p);
             AstExpr *expr = NULL;
             if (peek_token(&p->lexer) == Token_Equal)
               {

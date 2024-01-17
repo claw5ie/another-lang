@@ -7,7 +7,6 @@ struct Ast
 };
 
 typedef struct AstExpr AstExpr;
-typedef AstExpr AstType;
 typedef LinkedList AstStmtBlock;
 
 typedef u32 ScopeId;
@@ -22,14 +21,14 @@ struct AstSymbolKey
 typedef struct AstSymbolVariable AstSymbolVariable;
 struct AstSymbolVariable
 {
-  AstType *type;
+  AstExpr *type;
   AstExpr *expr;
 };
 
 typedef struct AstSymbolParameter AstSymbolParameter;
 struct AstSymbolParameter
 {
-  AstType *type;
+  AstExpr *type;
   bool has_name;
 };
 
@@ -37,14 +36,14 @@ typedef struct AstSymbolProcedure AstSymbolProcedure;
 struct AstSymbolProcedure
 {
   LinkedList params;
-  AstType *return_type;
+  AstExpr *return_type;
   AstStmtBlock block;
 };
 
 typedef struct AstSymbolStructField AstSymbolStructField;
 struct AstSymbolStructField
 {
-  AstType *type;
+  AstExpr *type;
 };
 
 typedef struct AstSymbolStruct AstSymbolStruct;
@@ -68,7 +67,7 @@ struct AstSymbolEnum
 typedef struct AstSymbolAlias AstSymbolAlias;
 struct AstSymbolAlias
 {
-  AstType *type;
+  AstExpr *type;
 };
 
 typedef union AstSymbolData AstSymbolData;
@@ -166,7 +165,7 @@ typedef struct AstExprTypeProc AstExprTypeProc;
 struct AstExprTypeProc
 {
   LinkedList params;
-  AstType *return_type;
+  AstExpr *return_type;
 };
 
 typedef struct AstExprCall AstExprCall;
@@ -190,6 +189,39 @@ struct AstExprCast2
   AstExpr *expr;
 };
 
+typedef union AstExprTypeData AstExprTypeData;
+union AstExprTypeData
+{
+  AstExprTypeInt Int;
+  AstExpr *Pointer;
+  AstExprTypeProc Proc;
+  AstExprArrayAccess Array;
+  AstSymbolStruct Struct;
+  AstSymbolStruct Union;
+  AstSymbolEnum Enum;
+};
+
+enum AstExprTypeTag
+  {
+    Ast_Expr_Type_Void,
+    Ast_Expr_Type_Bool,
+    Ast_Expr_Type_Int,
+    Ast_Expr_Type_Pointer,
+    Ast_Expr_Type_Proc,
+    Ast_Expr_Type_Array,
+    Ast_Expr_Type_Struct,
+    Ast_Expr_Type_Union,
+    Ast_Expr_Type_Enum,
+  };
+typedef enum AstExprTypeTag AstExprTypeTag;
+
+typedef struct AstExprType AstExprType;
+struct AstExprType
+{
+  AstExprTypeTag tag;
+  AstExprTypeData as;
+};
+
 typedef struct AstExprDesignator AstExprDesignator;
 struct AstExprDesignator
 {
@@ -203,15 +235,11 @@ union AstExprData
   AstExprBinaryOp Binary_Op;
   AstExprUnaryOp Unary_Op;
   AstExprArrayAccess Array_Access;
-  AstExprTypeInt Type_Int;
-  AstExprTypeProc Type_Proc;
-  AstSymbolStruct Type_Struct;
-  AstSymbolStruct Type_Union;
-  AstSymbolEnum Type_Enum;
   AstExprCall Call;
   AstExprFieldAccess Field_Access;
   AstExpr *Cast1;
   AstExprCast2 Cast2;
+  AstExprType Type;
   u64 Int64;
   bool Bool;
   AstExprDesignator Designator;
@@ -223,17 +251,11 @@ enum AstExprTag
     Ast_Expr_Binary_Op,
     Ast_Expr_Unary_Op,
     Ast_Expr_Array_Access,
-    Ast_Expr_Type_Void,
-    Ast_Expr_Type_Bool,
-    Ast_Expr_Type_Int,
-    Ast_Expr_Type_Proc,
-    Ast_Expr_Type_Struct,
-    Ast_Expr_Type_Union,
-    Ast_Expr_Type_Enum,
     Ast_Expr_Call,
     Ast_Expr_Field_Access,
     Ast_Expr_Cast1,
     Ast_Expr_Cast2,
+    Ast_Expr_Type,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
     Ast_Expr_Designator,
