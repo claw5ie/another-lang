@@ -682,7 +682,10 @@ parse_highest_prec_base(Parser *p)
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Identifier,
-          .as = { .Identifier = token.text },
+          .as = { .Identifier = {
+              .name = token.text,
+              .scope = p->current_scope,
+            } },
           .line_info = token.line_info,
         };
         return expr;

@@ -233,6 +233,13 @@ struct AstExprDesignator
   AstExpr *expr;
 };
 
+typedef struct AstExprIdentifier AstExprIdentifier;
+struct AstExprIdentifier
+{
+  StringView name;
+  Scope *scope;
+};
+
 typedef union AstExprData AstExprData;
 union AstExprData
 {
@@ -247,7 +254,7 @@ union AstExprData
   u64 Int64;
   bool Bool;
   AstExprDesignator Designator;
-  StringView Identifier;
+  AstExprIdentifier Identifier;
 };
 
 enum AstExprTag

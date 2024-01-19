@@ -233,9 +233,9 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Identifier:
       {
-        StringView Identifier = expr->as.Identifier;
+        AstExprIdentifier *Identifier = &expr->as.Identifier;
 
-        printf("%.*s", FORMAT_STRING_VIEW(Identifier));
+        printf("%.*s", FORMAT_STRING_VIEW(Identifier->name));
       }
 
       break;
