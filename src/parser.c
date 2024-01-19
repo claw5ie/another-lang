@@ -8,9 +8,8 @@ struct Parser
   Arena arena;
   HashTable symbols;
 
-  ScopeId *scopes;
-  size_t scope_count;
-  ScopeId next_scope;
+  Scope *current_scope;
+  Scope *global_scope;
 
   AstExpr *exprs[MAX_EXPR_COUNT];
 };
@@ -59,33 +58,6 @@ are_symbols_equal(void *key0, void *key1)
   return k0->scope == k1->scope && are_views_equal(k0->name, k1->name);
 }
 
-void
-push_scope(Parser *p)
-{
-  if (p->scope_count >= MAX_SCOPE_COUNT)
-    {
-      // Line info may not be accurate if the last token in buffer doesn't begin the scope.
-      PRINT_ERROR(p->lexer.filepath, p->lexer.line_info, "reached limit of scopes: %i", MAX_SCOPE_COUNT);
-      exit(EXIT_FAILURE);
-    }
-
-  p->scopes[p->scope_count++] = p->next_scope++;
-}
-
-ScopeId
-grab_current_scope(Parser *p)
-{
-  assert(p->scope_count > 0);
-  return p->scopes[p->scope_count - 1];
-}
-
-void
-pop_scope(Parser *p)
-{
-  assert(p->scope_count > 0);
-  --p->scope_count;
-}
-
 void *
 parser_malloc(Parser *p, size_t size)
 {
@@ -95,12 +67,26 @@ parser_malloc(Parser *p, size_t size)
   return data;
 }
 
+void
+push_scope(Parser *p)
+{
+  Scope *scope = parser_malloc(p, sizeof(*scope));
+  scope->parent = p->current_scope;
+  p->current_scope = scope;
+}
+
+void
+pop_scope(Parser *p)
+{
+  p->current_scope = p->current_scope->parent;
+}
+
 AstSymbol *
 insert_symbol(Parser *p, Token *id_token)
 {
   AstSymbolKey key = {
     .name = id_token->text,
-    .scope = grab_current_scope(p),
+    .scope = p->current_scope,
   };
   bool was_inserted = false;
   AstSymbol *symbol = hash_table_insert(&p->symbols, &key, &was_inserted);
@@ -1311,11 +1297,6 @@ parse(const char *filepath)
   size_t source_code_size = 0;
   char *source_code = read_entire_file(filepath, &source_code_size);
 
-  // Could be a global variable or static one.
-  ScopeId *scopes = malloc(MAX_SCOPE_COUNT * sizeof(*scopes));
-  if (scopes == NULL)
-    abort();
-
   Parser parser = {
     .lexer = {
       .token_start = 0,
@@ -1332,14 +1313,15 @@ parse(const char *filepath)
       .key_hash = symbol_hash,
       .are_keys_equal = are_symbols_equal,
     },
-    .scopes = scopes,
-    .scope_count = 0,
-    .next_scope = 0,
+    .current_scope = NULL,
+    .global_scope = NULL,
   };
 
   LinkedList globals = { 0 };
 
-  push_scope(&parser);
+  Scope *global_scope = parser_malloc(&parser, sizeof(*global_scope));
+  parser.current_scope = global_scope;
+  parser.global_scope = global_scope;
 
   while (peek_token(&parser.lexer) != Token_End_Of_File)
     {
@@ -1355,10 +1337,7 @@ parse(const char *filepath)
       linked_list_insert_last(&globals, node);
     }
 
-  pop_scope(&parser);
-  assert(parser.scope_count == 0);
-
-  free(scopes);
+  assert(parser.current_scope == global_scope);
 
   Ast ast = {
     .globals = globals,

@@ -9,13 +9,17 @@ struct Ast
 typedef struct AstExpr AstExpr;
 typedef LinkedList AstStmtBlock;
 
-typedef u32 ScopeId;
+typedef struct Scope Scope;
+struct Scope
+{
+  Scope *parent;
+};
 
 typedef struct AstSymbolKey AstSymbolKey;
 struct AstSymbolKey
 {
   StringView name;
-  ScopeId scope;
+  Scope *scope;
 };
 
 typedef struct AstSymbolVariable AstSymbolVariable;
