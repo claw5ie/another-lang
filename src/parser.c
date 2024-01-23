@@ -62,7 +62,7 @@ void *
 parser_malloc(Parser *p, size_t size)
 {
   void *data = arena_malloc(&p->arena, size);
-  if (data == NULL)
+  if (!data)
     abort();
   return data;
 }
@@ -231,34 +231,18 @@ parse_procedure_header(Parser *p, LinkedList *params, AstExpr **return_type, boo
         }
 
       AstExpr *type = parse_type(p);
-      AstSymbol *symbol = NULL;
-
-      if (insert_params_into_table && has_name)
-        {
-          symbol = insert_symbol(p, &param_id_token);
-          *symbol = (AstSymbol){
-            .tag = Ast_Symbol_Parameter,
-            .as = { .Parameter = {
-                .type = type,
-                .has_name = has_name,
-              } },
-            .name = param_id_token.text,
-            .line_info = param_id_token.line_info,
-          };
-        }
-      else
-        {
-          symbol = parser_malloc(p, sizeof(*symbol));
-          *symbol = (AstSymbol){
-            .tag = Ast_Symbol_Parameter,
-            .as = { .Parameter = {
-                .type = type,
-                .has_name = has_name,
-              } },
-            .name = { 0 },
-            .line_info = param_id_token.line_info,
-          };
-        }
+      AstSymbol *symbol = insert_params_into_table && has_name
+        ? insert_symbol(p, &param_id_token)
+        : parser_malloc(p, sizeof(*symbol));
+      *symbol = (AstSymbol){
+        .tag = Ast_Symbol_Parameter,
+        .as = { .Parameter = {
+            .type = type,
+            .has_name = has_name,
+          } },
+        .name = param_id_token.text,
+        .line_info = param_id_token.line_info,
+      };
 
       LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
@@ -287,7 +271,7 @@ parse_procedure_header(Parser *p, LinkedList *params, AstExpr **return_type, boo
         .as = { .Type = {
             .tag = Ast_Expr_Type_Void,
           } },
-        .line_info = { 0 }, // What line info should I put here?
+        .line_info = { 0 }, // TODO: put line info here.
       };
       *return_type = type;
     }
@@ -679,16 +663,34 @@ parse_highest_prec_base(Parser *p)
       }
     case Expr_Start_Identifier:
       {
-        AstExpr *expr = parser_malloc(p, sizeof(*expr));
-        *expr = (AstExpr){
-          .tag = Ast_Expr_Identifier,
-          .as = { .Identifier = {
-              .name = token.text,
-              .scope = p->current_scope,
-            } },
-          .line_info = token.line_info,
-        };
-        return expr;
+        if (token.text.count == 1 && token.text.data[0] == '_' &&
+            peek_token(&p->lexer) == Token_Open_Paren)
+          {
+            LinkedList expr_list = parse_comma_separated_exprs(p, Token_Open_Paren, Token_Close_Paren);
+            AstExpr *expr = parser_malloc(p, sizeof(*expr));
+            *expr = (AstExpr){
+              .tag = Ast_Expr_Type_Cons,
+              .as = { .Type_Cons = {
+                  .lhs = NULL,
+                  .args = expr_list,
+                } },
+              .line_info = token.line_info,
+            };
+            return expr;
+          }
+        else
+          {
+            AstExpr *expr = parser_malloc(p, sizeof(*expr));
+            *expr = (AstExpr){
+              .tag = Ast_Expr_Identifier,
+              .as = { .Identifier = {
+                  .name = token.text,
+                  .scope = p->current_scope,
+                } },
+              .line_info = token.line_info,
+            };
+            return expr;
+          }
       }
     }
 
@@ -882,12 +884,21 @@ parse_symbol(Parser *p)
         expect_token(&p->lexer, Token_Identifier);
         LinkedList fields = parse_struct_fields(p);
 
+        AstExpr *type = parser_malloc(p, sizeof(*type));
+        *type = (AstExpr){
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Struct,
+              .as = { .Struct = {
+                  .fields = fields,
+                } },
+            } },
+          .line_info = id_token.line_info,
+        };
         AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
-          .tag = Ast_Symbol_Struct,
-          .as = { .Struct = {
-              .fields = fields,
-            } },
+          .tag = Ast_Symbol_Type,
+          .as = { .Type = type },
           .name = id_token.text,
           .line_info = id_token.line_info,
         };
@@ -902,12 +913,21 @@ parse_symbol(Parser *p)
         expect_token(&p->lexer, Token_Identifier);
         LinkedList fields = parse_struct_fields(p);
 
+        AstExpr *type = parser_malloc(p, sizeof(*type));
+        *type = (AstExpr){
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Union,
+              .as = { .Union = {
+                  .fields = fields,
+                } },
+            } },
+          .line_info = id_token.line_info,
+        };
         AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
-          .tag = Ast_Symbol_Union,
-          .as = { .Union = {
-              .fields = fields,
-            } },
+          .tag = Ast_Symbol_Type,
+          .as = { .Type = type },
           .name = id_token.text,
           .line_info = id_token.line_info,
         };
@@ -922,12 +942,21 @@ parse_symbol(Parser *p)
         expect_token(&p->lexer, Token_Identifier);
         LinkedList values = parse_enum_values(p);
 
+        AstExpr *type = parser_malloc(p, sizeof(*type));
+        *type = (AstExpr){
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Enum,
+              .as = { .Enum = {
+                  .values = values,
+                } },
+            } },
+          .line_info = id_token.line_info,
+        };
         AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
-          .tag = Ast_Symbol_Enum,
-          .as = { .Enum = {
-              .values = values,
-            } },
+          .tag = Ast_Symbol_Type,
+          .as = { .Type = type },
           .name = id_token.text,
           .line_info = id_token.line_info,
         };
@@ -949,6 +978,7 @@ parse_symbol(Parser *p)
           .tag = Ast_Symbol_Alias,
           .as = { .Alias = {
               .type = type,
+              .underlying_type = type,
             } },
           .name = id_token.text,
           .line_info = id_token.line_info,
@@ -1225,7 +1255,7 @@ parse_stmt(Parser *p)
       {
         AstSymbol *symbol = parse_symbol(p);
 
-        if (symbol != NULL)
+        if (symbol)
           {
             AstStmt stmt = {
               .tag = Ast_Stmt_Symbol,
@@ -1329,7 +1359,7 @@ parse(const char *filepath)
   while (peek_token(&parser.lexer) != Token_End_Of_File)
     {
       AstSymbol *symbol = parse_symbol(&parser);
-      if (symbol == NULL)
+      if (!symbol)
         {
           Token token = grab_token(&parser.lexer);
           PRINT_ERROR0(parser.lexer.filepath, token.line_info, "expected symbol definition");
@@ -1346,6 +1376,7 @@ parse(const char *filepath)
     .globals = globals,
     .arena = parser.arena,
     .symbols = parser.symbols,
+    .filepath = filepath,
   };
 
   return ast;

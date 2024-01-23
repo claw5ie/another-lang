@@ -91,15 +91,15 @@ arena_malloc(Arena *arena, size_t size)
   size -= size % sizeof(void *);
 
   ArenaBlock *block = arena->first;
-  for (; block != NULL; block = block->next)
+  for (; block; block = block->next)
     if (block->size + size <= block->capacity)
       break;
 
-  if (block == NULL)
+  if (!block)
     {
       size_t capacity = size <= ARENA_BLOCK_DEFAULT_CAPACITY ? ARENA_BLOCK_DEFAULT_CAPACITY : size;
       block = malloc(sizeof(ArenaBlock) + capacity);
-      if (block == NULL)
+      if (!block)
         abort();
       *block = (ArenaBlock){
         .size = 0,
@@ -107,11 +107,8 @@ arena_malloc(Arena *arena, size_t size)
         .next = NULL,
       };
 
-      if (arena->last != NULL)
-        {
-          arena->last->next = block;
-          arena->last = block;
-        }
+      if (arena->last)
+        arena->last = arena->last->next = block;
       else
         arena->first = arena->last = block;
     }
@@ -152,13 +149,13 @@ hash_table_maybe_expand(HashTable *t)
       // 'NULL' is not guaranteed to be 0, I think, so can't calloc??
       size_t new_capacity = 2 * (t->capacity + 1);
       HashTableNode **new_data = calloc(new_capacity, sizeof(*new_data));
-      if (new_data == NULL)
+      if (!new_data)
         abort();
 
       for (size_t i = t->capacity; i-- > 0; )
         {
           HashTableNode *node = t->data[i];
-          while (node != NULL)
+          while (node)
             {
               size_t index = node->hash % new_capacity;
 
@@ -182,7 +179,7 @@ hash_table_find(HashTable *t, void *key)
   if (t->capacity > 0)
     {
       HashTableNode *node = t->data[t->key_hash(key) % t->capacity];
-      for (; node != NULL; node = node->next)
+      for (; node; node = node->next)
         if (t->are_keys_equal(node->key, key))
           return node->data;
     }
@@ -200,7 +197,7 @@ hash_table_insert(HashTable *t, void *key, bool *was_inserted)
 
   {
     void *data = hash_table_find(t, key);
-    if (data != NULL)
+    if (data)
       return data;
   }
 
@@ -209,7 +206,7 @@ hash_table_insert(HashTable *t, void *key, bool *was_inserted)
   size_t hash = t->key_hash(key);
   size_t index = hash % t->capacity;
   HashTableNode *node = malloc(sizeof(*node) + t->key_size + t->data_size);
-  if (node == NULL)
+  if (!node)
     abort();
   node->key = (char *)node + sizeof(*node);
   node->data = (char *)node->key + t->key_size;

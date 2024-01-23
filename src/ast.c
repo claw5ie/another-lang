@@ -4,8 +4,10 @@ struct Ast
   LinkedList globals;
   Arena arena;
   HashTable symbols;
+  const char *filepath;
 };
 
+typedef struct AstSymbol AstSymbol;
 typedef struct AstExpr AstExpr;
 typedef LinkedList AstStmtBlock;
 
@@ -44,6 +46,13 @@ struct AstSymbolProcedure
   AstStmtBlock block;
 };
 
+typedef struct AstSymbolAlias AstSymbolAlias;
+struct AstSymbolAlias
+{
+  AstExpr *type;
+  AstExpr *underlying_type;
+};
+
 typedef struct AstSymbolStructField AstSymbolStructField;
 struct AstSymbolStructField
 {
@@ -68,11 +77,13 @@ struct AstSymbolEnum
   LinkedList values;
 };
 
-typedef struct AstSymbolAlias AstSymbolAlias;
-struct AstSymbolAlias
-{
-  AstExpr *type;
-};
+enum AstSymbolFlag
+  {
+    AST_SYMBOL_FLAG_NOT_RESOLVED,
+    AST_SYMBOL_FLAG_BEING_RESOLVED,
+    AST_SYMBOL_FLAG_IS_RESOLVED,
+  };
+typedef enum AstSymbolFlag AstSymbolFlag;
 
 typedef union AstSymbolData AstSymbolData;
 union AstSymbolData
@@ -80,9 +91,7 @@ union AstSymbolData
   AstSymbolVariable Variable;
   AstSymbolParameter Parameter;
   AstSymbolProcedure Procedure;
-  AstSymbolStruct Struct;
-  AstSymbolStruct Union;
-  AstSymbolEnum Enum;
+  AstExpr *Type;
   AstSymbolAlias Alias;
   AstSymbolStructField Struct_Field;
   AstSymbolEnumValue Enum_Value;
@@ -93,22 +102,20 @@ enum AstSymbolTag
     Ast_Symbol_Variable,
     Ast_Symbol_Parameter,
     Ast_Symbol_Procedure,
-    Ast_Symbol_Struct,
-    Ast_Symbol_Union,
-    Ast_Symbol_Enum,
+    Ast_Symbol_Type,
     Ast_Symbol_Alias,
     Ast_Symbol_Struct_Field,
     Ast_Symbol_Enum_Value,
   };
 typedef enum AstSymbolTag AstSymbolTag;
 
-typedef struct AstSymbol AstSymbol;
 struct AstSymbol
 {
   AstSymbolTag tag;
   AstSymbolData as;
   StringView name;
   LineInfo line_info;
+  AstSymbolFlag resolving_stage: 2;
 };
 
 enum AstExprBinaryOpTag
@@ -203,6 +210,7 @@ union AstExprTypeData
   AstSymbolStruct Struct;
   AstSymbolStruct Union;
   AstSymbolEnum Enum;
+  AstSymbol *Symbol;
 };
 
 enum AstExprTypeTag
@@ -216,6 +224,7 @@ enum AstExprTypeTag
     Ast_Expr_Type_Struct,
     Ast_Expr_Type_Union,
     Ast_Expr_Type_Enum,
+    Ast_Expr_Type_Symbol,
   };
 typedef enum AstExprTypeTag AstExprTypeTag;
 
@@ -247,6 +256,7 @@ union AstExprData
   AstExprUnaryOp Unary_Op;
   AstExprArrayAccess Array_Access;
   AstExprCall Call;
+  AstExprCall Type_Cons;
   AstExprFieldAccess Field_Access;
   AstExpr *Cast1;
   AstExprCast2 Cast2;
@@ -254,6 +264,7 @@ union AstExprData
   u64 Int64;
   bool Bool;
   AstExprDesignator Designator;
+  AstSymbol *Symbol;
   AstExprIdentifier Identifier;
 };
 
@@ -263,6 +274,7 @@ enum AstExprTag
     Ast_Expr_Unary_Op,
     Ast_Expr_Array_Access,
     Ast_Expr_Call,
+    Ast_Expr_Type_Cons,
     Ast_Expr_Field_Access,
     Ast_Expr_Cast1,
     Ast_Expr_Cast2,
@@ -271,6 +283,7 @@ enum AstExprTag
     Ast_Expr_Bool,
     Ast_Expr_Designator,
     Ast_Expr_Null,
+    Ast_Expr_Symbol,
     Ast_Expr_Identifier,
   };
 typedef enum AstExprTag AstExprTag;

@@ -1,5 +1,5 @@
 // Prohibit symbol definition in single statement blocks, like:
-// if true a :: int = 42;
+// if true a :: i32 = 42;
 
 enum Bar
 {
@@ -32,12 +32,12 @@ proc foo(x :: bool, y :: i32) -> i32
 
 proc main(bool, i32)
 {
-  alias foo = i32;
+  alias Foz = i32;
 
   a :: Foo = _(x = 2);
   b ::= Foo(x = 2);
 
-  c :: struct{ x :: int };
+  c :: struct{ x :: i32 };
   d :: enum{ x };
   alias Foo = union{ x :: 42 };
 
@@ -75,7 +75,6 @@ proc main(bool, i32)
     default 42;
     }
 
-  hello;
   2 + 2 * 2;
   (2 + 2) * 2;
   -2 + --2;
@@ -106,10 +105,10 @@ proc main(bool, i32)
    { }
   while true;
 
-  e :: int = 42;
+  e :: i32 = 42;
   f :: i32 = 42;
   g :: i42 = 42;
-  h = 69;
+  h ::= 69;
   p ::= false;
 
   i :: i42 = 42;
@@ -117,17 +116,29 @@ proc main(bool, i32)
   k :: i42 = b**;
 
   l :: i32[3] = _(42, _(42), 90);
+  ll :: Foo[3] = _(42, Foo(42), 90);
 
   a[2][42] = 42;
 
   m :: proc(i32, hello :: bool);
   n :: proc(i32, hello :: bool) = null;
 
-  o = _(hello = 42);
+  o ::= _(hello = 42);
+
+  bar ::= main;
 
   a();
   (bar)(name = 42);
-  (hello*)(2, 3, (4 - 4), _(2, 3));
+  (o*)(2, 3, (4 - 4), _(2, 3));
+
+  foofaz();
 
   return;
+}
+
+proc foofaz()
+{
+  alias A = B;
+  alias B = C;
+  alias C = i42;
 }

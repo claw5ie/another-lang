@@ -20,7 +20,7 @@ read_entire_file(const char *filepath, size_t *file_size)
   }
 
   data = malloc(size + 1);
-  if (data == NULL)
+  if (!data)
     abort();
   else if (read(fd, data, size) == -1)
     goto print_error;
@@ -28,7 +28,7 @@ read_entire_file(const char *filepath, size_t *file_size)
 
   close(fd);
 
-  if (file_size != NULL)
+  if (file_size)
     *file_size = size;
 
   return data;
