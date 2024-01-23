@@ -422,7 +422,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
 
         put_spaces(ident);
         transpile_to_c_type(Type, ident);
-        PUTS("\n");
+        PUTS(";\n");
       }
 
       break;
