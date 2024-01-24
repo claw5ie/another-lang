@@ -1045,6 +1045,8 @@ parse_symbol(Parser *p)
     }
 }
 
+AstStmt parse_stmt_but_not_symbol(Parser *);
+
 AstStmt
 parse_stmt(Parser *p)
 {
@@ -1079,12 +1081,12 @@ parse_stmt(Parser *p)
         AstStmt *if_true = parser_malloc(p, sizeof(*if_true));
         AstStmt *if_false = NULL;
 
-        *if_true = parse_stmt(p);
+        *if_true = parse_stmt_but_not_symbol(p);
         if (peek_token(&p->lexer) == Token_Else)
           {
             advance_token(&p->lexer);
             if_false = parser_malloc(p, sizeof(*if_false));
-            *if_false = parse_stmt(p);
+            *if_false = parse_stmt_but_not_symbol(p);
           }
 
         AstStmt stmt = {
@@ -1108,7 +1110,7 @@ parse_stmt(Parser *p)
           advance_token(&p->lexer);
 
         AstStmt *block = parser_malloc(p, sizeof(*block));
-        *block = parse_stmt(p);
+        *block = parse_stmt_but_not_symbol(p);
 
         AstStmt stmt = {
           .tag = Ast_Stmt_While,
@@ -1127,7 +1129,7 @@ parse_stmt(Parser *p)
         advance_token(&p->lexer);
 
         AstStmt *block = parser_malloc(p, sizeof(*block));
-        *block = parse_stmt(p);
+        *block = parse_stmt_but_not_symbol(p);
 
         expect_token(&p->lexer, Token_While);
         AstExpr *expr = parse_expr(p);
@@ -1224,7 +1226,7 @@ parse_stmt(Parser *p)
           advance_token(&p->lexer);
 
         AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
-        *substmt = parse_stmt(p);
+        *substmt = parse_stmt_but_not_symbol(p);
 
         AstStmt stmt = {
           .tag = Ast_Stmt_Case,
@@ -1241,7 +1243,7 @@ parse_stmt(Parser *p)
       {
         advance_token(&p->lexer);
         AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
-        *substmt = parse_stmt(p);
+        *substmt = parse_stmt_but_not_symbol(p);
 
         AstStmt stmt = {
           .tag = Ast_Stmt_Default,
@@ -1322,6 +1324,18 @@ parse_stmt_block(Parser *p)
   expect_token(&p->lexer, Token_Close_Curly);
 
   return block;
+}
+
+AstStmt
+parse_stmt_but_not_symbol(Parser *p)
+{
+  AstStmt stmt = parse_stmt(p);
+  if (stmt.tag == Ast_Stmt_Symbol)
+    {
+      PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "can't define variables here");
+      exit(EXIT_FAILURE);
+    }
+  return stmt;
 }
 
 Ast

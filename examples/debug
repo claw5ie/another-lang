@@ -1,6 +1,3 @@
-// Prohibit symbol definition in single statement blocks, like:
-// if true a :: i32 = 42;
-
 enum Bar
 {
   Hello,
