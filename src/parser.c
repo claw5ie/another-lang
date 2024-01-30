@@ -976,10 +976,7 @@ parse_symbol(Parser *p)
         AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Alias,
-          .as = { .Alias = {
-              .type = type,
-              .underlying_type = type,
-            } },
+          .as = { .Alias = type },
           .name = id_token.text,
           .line_info = id_token.line_info,
         };

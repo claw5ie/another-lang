@@ -10,6 +10,7 @@ put_spaces(size_t count)
 
 void transpile_to_c_expr(AstExpr *, size_t);
 void transpile_to_c_type(AstExpr *, size_t);
+void transpile_to_c_inner_type(AstExprType *, size_t);
 
 void
 transpile_to_c_expr_list(LinkedList *list, size_t ident)
@@ -270,7 +271,19 @@ transpile_to_c_type(AstExpr *expr, size_t ident)
 
   AstExprType *Type = &expr->as.Type;
 
-  switch (Type->tag)
+  if (Type->symbol)
+    {
+      printf("%.*s", FORMAT_STRING_VIEW(Type->symbol->name));
+      return;
+    }
+
+  transpile_to_c_inner_type(Type, ident);
+}
+
+void
+transpile_to_c_inner_type(AstExprType *type, size_t ident)
+{
+  switch (type->tag)
     {
     case Ast_Expr_Type_Void:
       PUTS("void");
@@ -280,19 +293,19 @@ transpile_to_c_type(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Type_Int:
       {
-        AstExprTypeInt *Int = &Type->as.Int;
+        AstExprTypeInt *Int = &type->as.Int;
 
         printf("%c%i", Int->is_signed ? 'i' : 'u', Int->bits);
       }
 
       break;
     case Ast_Expr_Type_Pointer:
-      transpile_to_c_type(Type->as.Pointer, ident);
+      transpile_to_c_type(type->as.Pointer, ident);
       PUTS("*");
       break;
     case Ast_Expr_Type_Proc:
       {
-        AstExprTypeProc *Proc = &Type->as.Proc;
+        AstExprTypeProc *Proc = &type->as.Proc;
 
         PUTS("proc");
         transpile_to_c_procedure_header(&Proc->params, Proc->return_type, ident);
@@ -301,7 +314,7 @@ transpile_to_c_type(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Type_Array:
       {
-        AstExprArrayAccess *Array = &Type->as.Array;
+        AstExprArrayAccess *Array = &type->as.Array;
 
         transpile_to_c_type(Array->lhs, ident);
         PUTS("[");
@@ -312,7 +325,7 @@ transpile_to_c_type(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Type_Struct:
       {
-        AstSymbolStruct *Struct = &Type->as.Struct;
+        AstSymbolStruct *Struct = &type->as.Struct;
 
         PUTS("struct\n");
         transpile_to_c_struct_fields(&Struct->fields, ident);
@@ -321,7 +334,7 @@ transpile_to_c_type(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Type_Union:
       {
-        AstSymbolStruct *Union = &Type->as.Union;
+        AstSymbolStruct *Union = &type->as.Union;
 
         PUTS("union\n");
         transpile_to_c_struct_fields(&Union->fields, ident);
@@ -330,18 +343,10 @@ transpile_to_c_type(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Type_Enum:
       {
-        AstSymbolEnum *Enum = &Type->as.Enum;
+        AstSymbolEnum *Enum = &type->as.Enum;
 
         PUTS("enum\n");
         transpile_to_c_enum_values(&Enum->values, ident + TAB_SPACE);
-      }
-
-      break;
-    case Ast_Expr_Type_Symbol:
-      {
-        AstSymbol *Symbol = Type->as.Symbol;
-
-        printf("%.*s", FORMAT_STRING_VIEW(Symbol->name));
       }
 
       break;
@@ -419,26 +424,21 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
     case Ast_Symbol_Type:
       {
         AstExpr *Type = symbol->as.Type;
+        assert(Type->tag == Ast_Expr_Type);
 
-        put_spaces(ident);
-        transpile_to_c_type(Type, ident);
-        PUTS(";\n");
-      }
-
-      break;
-    case Ast_Symbol_Alias:
-      {
-        AstSymbolAlias *Alias = &symbol->as.Alias;
-
-        put_spaces(ident);
-        PUTS("typedef ");
-        transpile_to_c_expr(Alias->type, ident);
-        printf(" %.*s;", FORMAT_STRING_VIEW(symbol->name));
+        if (!(symbol->flags & AST_SYMBOL_FLAG_IS_UNPACKED))
+          {
+            put_spaces(ident);
+            PUTS("typedef ");
+            transpile_to_c_inner_type(&Type->as.Type, ident);
+            printf(" %.*s;\n", FORMAT_STRING_VIEW(symbol->name));
+          }
       }
 
       break;
     case Ast_Symbol_Struct_Field:
     case Ast_Symbol_Enum_Value:
+    case Ast_Symbol_Alias:
       UNREACHABLE();
     }
 }

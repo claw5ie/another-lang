@@ -46,13 +46,6 @@ struct AstSymbolProcedure
   AstStmtBlock block;
 };
 
-typedef struct AstSymbolAlias AstSymbolAlias;
-struct AstSymbolAlias
-{
-  AstExpr *type;
-  AstExpr *underlying_type;
-};
-
 typedef struct AstSymbolStructField AstSymbolStructField;
 struct AstSymbolStructField
 {
@@ -92,9 +85,9 @@ union AstSymbolData
   AstSymbolParameter Parameter;
   AstSymbolProcedure Procedure;
   AstExpr *Type;
-  AstSymbolAlias Alias;
   AstSymbolStructField Struct_Field;
   AstSymbolEnumValue Enum_Value;
+  AstExpr *Alias;
 };
 
 enum AstSymbolTag
@@ -116,7 +109,10 @@ struct AstSymbol
   StringView name;
   LineInfo line_info;
   AstSymbolFlag resolving_stage: 2;
+  u8 flags;
 };
+
+#define AST_SYMBOL_FLAG_IS_UNPACKED 0x1
 
 enum AstExprBinaryOpTag
   {
@@ -210,7 +206,6 @@ union AstExprTypeData
   AstSymbolStruct Struct;
   AstSymbolStruct Union;
   AstSymbolEnum Enum;
-  AstSymbol *Symbol;
 };
 
 enum AstExprTypeTag
@@ -224,7 +219,6 @@ enum AstExprTypeTag
     Ast_Expr_Type_Struct,
     Ast_Expr_Type_Union,
     Ast_Expr_Type_Enum,
-    Ast_Expr_Type_Symbol,
   };
 typedef enum AstExprTypeTag AstExprTypeTag;
 
@@ -233,6 +227,7 @@ struct AstExprType
 {
   AstExprTypeTag tag;
   AstExprTypeData as;
+  AstSymbol *symbol;
 };
 
 typedef struct AstExprDesignator AstExprDesignator;

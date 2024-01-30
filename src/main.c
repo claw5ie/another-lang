@@ -42,5 +42,6 @@ main(void)
   Ast ast = parse("examples/debug");
   resolve_identifiers(&ast);
   transpile_to_c(&ast);
+
   return EXIT_SUCCESS;
 }

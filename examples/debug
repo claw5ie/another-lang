@@ -135,7 +135,12 @@ proc main(bool, i32)
 
 proc foofaz()
 {
-  alias A = B;
+  alias C = i32;
   alias B = C;
-  alias C = i42;
+  alias A = B;
+
+  struct Foo
+  {
+    x :: Foo*,
+  }
 }

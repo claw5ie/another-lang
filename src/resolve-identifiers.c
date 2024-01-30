@@ -40,15 +40,15 @@ find_symbol(Ast *ast, StringView name, Scope *scope, LineInfo line_info)
   exit(EXIT_FAILURE);
 }
 
-void resolve_identifiers_expr(Ast *, AstExpr *);
+void resolve_identifiers_expr(Ast *, AstExpr **);
 
 void
 resolve_identifiers_expr_list(Ast *ast, LinkedList *list)
 {
   for (LinkedListNode *node = list->first; node; node = node->next)
     {
-      AstExpr *expr = LINKED_LIST_GET_NODE_DATA(AstExpr *, node);
-      resolve_identifiers_expr(ast, expr);
+      AstExpr **expr_ptr = &LINKED_LIST_GET_NODE_DATA(AstExpr *, node);
+      resolve_identifiers_expr(ast, expr_ptr);
     }
 }
 
@@ -60,9 +60,9 @@ resolve_identifiers_procedure_header(Ast *ast, LinkedList *params, AstExpr *retu
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       AstSymbolParameter *Parameter = &symbol->as.Parameter;
 
-      resolve_identifiers_expr(ast, Parameter->type);
+      resolve_identifiers_expr(ast, &Parameter->type);
     }
-  resolve_identifiers_expr(ast, return_type);
+  resolve_identifiers_expr(ast, &return_type);
 }
 
 void
@@ -73,13 +73,15 @@ resolve_identifiers_struct_fields(Ast *ast, LinkedList *fields)
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       AstSymbolStructField *Struct_Field = &symbol->as.Struct_Field;
 
-      resolve_identifiers_expr(ast, Struct_Field->type);
+      resolve_identifiers_expr(ast, &Struct_Field->type);
     }
 }
 
 void
-resolve_identifiers_type(Ast *ast, AstExpr *expr)
+resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
 {
+  AstExpr *expr = *expr_ptr;
+
   assert(expr->tag == Ast_Expr_Type);
 
   AstExprType *Type = &expr->as.Type;
@@ -91,7 +93,7 @@ resolve_identifiers_type(Ast *ast, AstExpr *expr)
     case Ast_Expr_Type_Int:
       break;
     case Ast_Expr_Type_Pointer:
-      resolve_identifiers_expr(ast, Type->as.Pointer);
+      resolve_identifiers_expr(ast, &Type->as.Pointer);
       break;
     case Ast_Expr_Type_Proc:
       {
@@ -105,8 +107,8 @@ resolve_identifiers_type(Ast *ast, AstExpr *expr)
       {
         AstExprArrayAccess *Array = &Type->as.Array;
 
-        resolve_identifiers_expr(ast, Array->lhs);
-        resolve_identifiers_expr(ast, Array->index);
+        resolve_identifiers_expr(ast, &Array->lhs);
+        resolve_identifiers_expr(ast, &Array->index);
       }
 
       break;
@@ -128,24 +130,24 @@ resolve_identifiers_type(Ast *ast, AstExpr *expr)
       break;
     case Ast_Expr_Type_Enum:
       break;
-    case Ast_Expr_Type_Symbol:
-      UNREACHABLE();
     }
 }
 
 void resolve_identifiers_symbol(Ast *, AstSymbol *);
 
 void
-resolve_identifiers_expr(Ast *ast, AstExpr *expr)
+resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
 {
+  AstExpr *expr = *expr_ptr;
+
   switch (expr->tag)
     {
     case Ast_Expr_Binary_Op:
       {
         AstExprBinaryOp *Binary_Op = &expr->as.Binary_Op;
 
-        resolve_identifiers_expr(ast, Binary_Op->lhs);
-        resolve_identifiers_expr(ast, Binary_Op->rhs);
+        resolve_identifiers_expr(ast, &Binary_Op->lhs);
+        resolve_identifiers_expr(ast, &Binary_Op->rhs);
       }
 
       break;
@@ -153,7 +155,7 @@ resolve_identifiers_expr(Ast *ast, AstExpr *expr)
       {
         AstExprUnaryOp *Unary_Op = &expr->as.Unary_Op;
 
-        resolve_identifiers_expr(ast, Unary_Op->subexpr);
+        resolve_identifiers_expr(ast, &Unary_Op->subexpr);
 
         if (Unary_Op->subexpr->tag == Ast_Expr_Type && Unary_Op->tag == Ast_Expr_Unary_Op_Deref)
           {
@@ -171,8 +173,8 @@ resolve_identifiers_expr(Ast *ast, AstExpr *expr)
       {
         AstExprArrayAccess *Array_Access = &expr->as.Array_Access;
 
-        resolve_identifiers_expr(ast, Array_Access->lhs);
-        resolve_identifiers_expr(ast, Array_Access->index);
+        resolve_identifiers_expr(ast, &Array_Access->lhs);
+        resolve_identifiers_expr(ast, &Array_Access->index);
 
         if (Array_Access->lhs->tag == Ast_Expr_Type)
           {
@@ -190,7 +192,7 @@ resolve_identifiers_expr(Ast *ast, AstExpr *expr)
       {
         AstExprCall *Call = &expr->as.Call;
 
-        resolve_identifiers_expr(ast, Call->lhs);
+        resolve_identifiers_expr(ast, &Call->lhs);
         resolve_identifiers_expr_list(ast, &Call->args);
 
         if (Call->lhs->tag == Ast_Expr_Type)
@@ -214,30 +216,30 @@ resolve_identifiers_expr(Ast *ast, AstExpr *expr)
       {
         AstExprFieldAccess *Field_Access = &expr->as.Field_Access;
 
-        resolve_identifiers_expr(ast, Field_Access->lhs);
+        resolve_identifiers_expr(ast, &Field_Access->lhs);
       }
 
       break;
     case Ast_Expr_Cast1:
-      resolve_identifiers_expr(ast, expr->as.Cast1);
+      resolve_identifiers_expr(ast, &expr->as.Cast1);
       break;
     case Ast_Expr_Cast2:
       {
         AstExprCast2 *Cast2 = &expr->as.Cast2;
 
-        resolve_identifiers_expr(ast, Cast2->type);
-        resolve_identifiers_expr(ast, Cast2->expr);
+        resolve_identifiers_expr(ast, &Cast2->type);
+        resolve_identifiers_expr(ast, &Cast2->expr);
       }
 
       break;
     case Ast_Expr_Type:
-      resolve_identifiers_type(ast, expr);
+      resolve_identifiers_type(ast, expr_ptr);
       break;
     case Ast_Expr_Designator:
       {
         AstExprDesignator *Designator = &expr->as.Designator;
 
-        resolve_identifiers_expr(ast, Designator->expr);
+        resolve_identifiers_expr(ast, &Designator->expr);
       }
 
       break;
@@ -251,20 +253,13 @@ resolve_identifiers_expr(Ast *ast, AstExpr *expr)
         switch (symbol->tag)
           {
           case Ast_Symbol_Type:
-            expr->tag = Ast_Expr_Type;
-            expr->as.Type = (AstExprType){
-              .tag = Ast_Expr_Type_Symbol,
-              .as = { .Symbol = symbol },
-            };
+            *expr_ptr = symbol->as.Type;
             break;
           case Ast_Symbol_Alias:
             resolve_identifiers_symbol(ast, symbol);
 
-            expr->tag = Ast_Expr_Type;
-            expr->as.Type = (AstExprType){
-              .tag = Ast_Expr_Type_Symbol,
-              .as = { .Symbol = symbol },
-            };
+            assert(symbol->tag == Ast_Symbol_Type);
+            *expr_ptr = symbol->as.Type;
             break;
           default:
             expr->tag = Ast_Expr_Symbol;
@@ -307,10 +302,10 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
         AstSymbolVariable *Variable = &symbol->as.Variable;
 
         if (Variable->type)
-          resolve_identifiers_expr(ast, Variable->type);
+          resolve_identifiers_expr(ast, &Variable->type);
 
         if (Variable->expr)
-          resolve_identifiers_expr(ast, Variable->expr);
+          resolve_identifiers_expr(ast, &Variable->expr);
       }
 
       break;
@@ -318,7 +313,7 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
       {
         AstSymbolParameter *Parameter = &symbol->as.Parameter;
 
-        resolve_identifiers_expr(ast, Parameter->type);
+        resolve_identifiers_expr(ast, &Parameter->type);
       }
 
       break;
@@ -332,30 +327,30 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
 
       break;
     case Ast_Symbol_Type:
-      resolve_identifiers_expr(ast, symbol->as.Type);
+      resolve_identifiers_expr(ast, &symbol->as.Type);
+      assert(symbol->as.Type->tag == Ast_Expr_Type);
+      symbol->as.Type->as.Type.symbol = symbol;
       break;
     case Ast_Symbol_Alias:
       {
-        AstSymbolAlias *Alias = &symbol->as.Alias;
-        AstExpr *Alias_Type = Alias->type;
+        if (symbol->as.Alias->tag == Ast_Expr_Identifier)
+          symbol->flags |= AST_SYMBOL_FLAG_IS_UNPACKED;
 
-        resolve_identifiers_expr(ast, Alias_Type);
+        resolve_identifiers_expr(ast, &symbol->as.Alias);
 
-        if (Alias_Type->tag == Ast_Expr_Type && Alias_Type->as.Type.tag == Ast_Expr_Type_Symbol)
+        // Gotta be careful with accessing subexpression, as they may be rewritten.
+        AstExpr *Alias = symbol->as.Alias;
+
+        if (Alias->tag != Ast_Expr_Type)
           {
-            AstSymbol *underlying_symbol = Alias_Type->as.Type.as.Symbol;
-            switch (symbol->tag)
-              {
-              case Ast_Symbol_Type:
-                Alias->underlying_type = underlying_symbol->as.Type;
-                break;
-              case Ast_Symbol_Alias:
-                Alias->underlying_type = underlying_symbol->as.Alias.underlying_type;
-                break;
-              default:
-                UNREACHABLE();
-              }
+            PRINT_ERROR0(ast->filepath, Alias->line_info, "exepected type, not expression");
+            exit(EXIT_FAILURE);
           }
+
+        symbol->tag = Ast_Symbol_Type;
+        symbol->as.Type = Alias;
+        if (!Alias->as.Type.symbol)
+          Alias->as.Type.symbol = symbol;
       }
 
       break;
@@ -379,7 +374,7 @@ resolve_identifiers_stmt(Ast *ast, AstStmt *stmt)
       {
         AstStmtIf *If = &stmt->as.If;
 
-        resolve_identifiers_expr(ast, If->cond);
+        resolve_identifiers_expr(ast, &If->cond);
         resolve_identifiers_stmt(ast, If->if_true);
         if (If->if_false)
           resolve_identifiers_stmt(ast, If->if_false);
@@ -390,19 +385,19 @@ resolve_identifiers_stmt(Ast *ast, AstStmt *stmt)
       {
         AstStmtWhile *While = &stmt->as.While;
 
-        resolve_identifiers_expr(ast, While->cond);
+        resolve_identifiers_expr(ast, &While->cond);
         resolve_identifiers_stmt(ast, While->block);
       }
 
       break;
     case Ast_Stmt_Return_Expr:
-      resolve_identifiers_expr(ast, stmt->as.Return_Expr);
+      resolve_identifiers_expr(ast, &stmt->as.Return_Expr);
       break;
     case Ast_Stmt_Switch:
       {
         AstStmtSwitch *Switch = &stmt->as.Switch;
 
-        resolve_identifiers_expr(ast, Switch->cond);
+        resolve_identifiers_expr(ast, &Switch->cond);
         resolve_identifiers_stmt_block(ast, &Switch->cases);
         // Default case is always null for now.
       }
@@ -412,7 +407,7 @@ resolve_identifiers_stmt(Ast *ast, AstStmt *stmt)
       {
         AstStmtCase *Case = &stmt->as.Case;
 
-        resolve_identifiers_expr(ast, Case->expr);
+        resolve_identifiers_expr(ast, &Case->expr);
         resolve_identifiers_stmt(ast, Case->substmt);
       }
 
@@ -424,8 +419,8 @@ resolve_identifiers_stmt(Ast *ast, AstStmt *stmt)
       {
         AstStmtAssign *Assign = &stmt->as.Assign;
 
-        resolve_identifiers_expr(ast, Assign->lhs);
-        resolve_identifiers_expr(ast, Assign->rhs);
+        resolve_identifiers_expr(ast, &Assign->lhs);
+        resolve_identifiers_expr(ast, &Assign->rhs);
       }
 
       break;
@@ -433,7 +428,7 @@ resolve_identifiers_stmt(Ast *ast, AstStmt *stmt)
       resolve_identifiers_symbol(ast, stmt->as.Symbol);
       break;
     case Ast_Stmt_Expr:
-      resolve_identifiers_expr(ast, stmt->as.Expr);
+      resolve_identifiers_expr(ast, &stmt->as.Expr);
       break;
     case Ast_Stmt_Break:
     case Ast_Stmt_Continue:
