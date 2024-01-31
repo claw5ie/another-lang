@@ -1,7 +1,7 @@
 enum Bar
 {
   Hello,
-  World,
+  World = .Hello,
 }
 
 union Baz

@@ -61,7 +61,7 @@ struct AstSymbolStruct
 typedef struct AstSymbolEnumValue AstSymbolEnumValue;
 struct AstSymbolEnumValue
 {
-  int dummy;
+  AstExpr *expr;
 };
 
 typedef struct AstSymbolEnum AstSymbolEnum;
@@ -260,6 +260,7 @@ union AstExprData
   bool Bool;
   AstExprDesignator Designator;
   AstSymbol *Symbol;
+  AstExprIdentifier Enum_Identifier;
   AstExprIdentifier Identifier;
 };
 
@@ -279,6 +280,7 @@ enum AstExprTag
     Ast_Expr_Designator,
     Ast_Expr_Null,
     Ast_Expr_Symbol,
+    Ast_Expr_Enum_Identifier,
     Ast_Expr_Identifier,
   };
 typedef enum AstExprTag AstExprTag;

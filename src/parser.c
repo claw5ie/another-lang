@@ -23,6 +23,7 @@ enum ExprStartTag
     Expr_Start_Unary_Not,
     Expr_Start_Unary_Reference,
     Expr_Start_Parenthesized,
+    Expr_Start_Dot,
     Expr_Start_Procedure_Type,
     Expr_Start_Unnamed_Struct_Type,
     Expr_Start_Unnamed_Union_Type,
@@ -338,12 +339,19 @@ parse_enum_values(Parser *p)
     {
       Token id_token = grab_token(&p->lexer);
       expect_token(&p->lexer, Token_Identifier);
+      AstExpr *expr = NULL;
+
+      if (peek_token(&p->lexer) == Token_Equal)
+        {
+          advance_token(&p->lexer);
+          expr = parse_expr(p);
+        }
 
       AstSymbol *symbol = insert_symbol(p, &id_token);
       *symbol = (AstSymbol){
         .tag = Ast_Symbol_Enum_Value,
         .as = { .Enum_Value = {
-            .dummy = 42,
+            .expr = expr,
           } },
         .name = id_token.text,
         .line_info = id_token.line_info,
@@ -379,6 +387,7 @@ can_token_start_expression(TokenTag tag)
     case Token_Not:         return Expr_Start_Unary_Not;
     case Token_Ref:         return Expr_Start_Unary_Reference;
     case Token_Open_Paren:  return Expr_Start_Parenthesized;
+    case Token_Dot:         return Expr_Start_Dot;
     case Token_Proc:        return Expr_Start_Procedure_Type;
     case Token_Struct:      return Expr_Start_Unnamed_Struct_Type;
     case Token_Union:       return Expr_Start_Unnamed_Union_Type;
@@ -481,6 +490,21 @@ parse_highest_prec_base(Parser *p)
       {
         AstExpr *expr = parse_expr(p);
         expect_token(&p->lexer, Token_Close_Paren);
+        return expr;
+      }
+    case Expr_Start_Dot:
+      {
+        Token id_token = grab_token(&p->lexer);
+        expect_token(&p->lexer, Token_Identifier);
+        AstExpr *expr = parser_malloc(p, sizeof(*expr));
+        *expr = (AstExpr){
+          .tag = Ast_Expr_Enum_Identifier,
+          .as = { .Enum_Identifier = {
+              .name = id_token.text,
+              .scope = p->current_scope,
+            } },
+          .line_info = token.line_info,
+        };
         return expr;
       }
     case Expr_Start_Procedure_Type:

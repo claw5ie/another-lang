@@ -129,6 +129,19 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
 
       break;
     case Ast_Expr_Type_Enum:
+      {
+        AstSymbolEnum *Enum = &Type->as.Enum;
+
+        for (LinkedListNode *node = Enum->values.first; node; node = node->next)
+          {
+            AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
+            AstSymbolEnumValue *Enum_Value = &symbol->as.Enum_Value;
+
+            if (Enum_Value->expr)
+              resolve_identifiers_expr(ast, &Enum_Value->expr);
+          }
+      }
+
       break;
     }
 }
@@ -242,6 +255,8 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
         resolve_identifiers_expr(ast, &Designator->expr);
       }
 
+      break;
+    case Ast_Expr_Enum_Identifier:
       break;
     case Ast_Expr_Identifier:
       {

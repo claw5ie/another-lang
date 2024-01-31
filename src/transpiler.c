@@ -72,10 +72,16 @@ transpile_to_c_enum_values(LinkedList *values, size_t ident)
   for (LinkedListNode *node = values->first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
-      // AstSymbolEnumValue *Enum_Value = &symbol->as.Enum_Value;
+      AstSymbolEnumValue *Enum_Value = &symbol->as.Enum_Value;
 
       put_spaces(ident + TAB_SPACE);
-      printf("%.*s,\n", FORMAT_STRING_VIEW(symbol->name));
+      printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
+      if (Enum_Value->expr)
+        {
+          PUTS(" = ");
+          transpile_to_c_expr(Enum_Value->expr, ident);
+        }
+      PUTS(",\n");
     }
   put_spaces(ident);
   PUTS("}");
@@ -259,8 +265,16 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       }
 
       break;
-    case Ast_Expr_Identifier:
+    case Ast_Expr_Enum_Identifier:
+      {
+        AstExprIdentifier *Enum_Identifier = &expr->as.Enum_Identifier;
+
+        printf(".%.*s", FORMAT_STRING_VIEW(Enum_Identifier->name));
+      }
+
       break;
+    case Ast_Expr_Identifier:
+      UNREACHABLE();
     }
 }
 
