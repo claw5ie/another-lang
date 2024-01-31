@@ -53,16 +53,16 @@ resolve_identifiers_expr_list(Ast *ast, LinkedList *list)
 }
 
 void
-resolve_identifiers_procedure_header(Ast *ast, LinkedList *params, AstExpr *return_type)
+resolve_identifiers_type_proc(Ast *ast, AstExprTypeProc *type)
 {
-  for (LinkedListNode *node = params->first; node; node = node->next)
+  for (LinkedListNode *node = type->params.first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       AstSymbolParameter *Parameter = &symbol->as.Parameter;
 
       resolve_identifiers_expr(ast, &Parameter->type);
     }
-  resolve_identifiers_expr(ast, &return_type);
+  resolve_identifiers_expr(ast, &type->return_type);
 }
 
 void
@@ -99,7 +99,7 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       {
         AstExprTypeProc *Proc = &Type->as.Proc;
 
-        resolve_identifiers_procedure_header(ast, &Proc->params, Proc->return_type);
+        resolve_identifiers_type_proc(ast, Proc);
       }
 
       break;
@@ -336,7 +336,7 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
       {
         AstSymbolProcedure *Procedure = &symbol->as.Procedure;
 
-        resolve_identifiers_procedure_header(ast, &Procedure->params, Procedure->return_type);
+        resolve_identifiers_type_proc(ast, &Procedure->type);
         resolve_identifiers_stmt_block(ast, &Procedure->block);
       }
 

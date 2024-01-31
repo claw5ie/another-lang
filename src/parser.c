@@ -213,10 +213,12 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
   return exprs;
 }
 
-void
-parse_procedure_header(Parser *p, LinkedList *params, AstExpr **return_type, bool insert_params_into_table)
+AstExprTypeProc
+parse_type_proc(Parser *p, bool insert_params_into_table)
 {
   expect_token(&p->lexer, Token_Open_Paren);
+
+  AstExprTypeProc result = { 0 };
 
   TokenTag tt = peek_token(&p->lexer);
   while (tt != Token_End_Of_File && tt != Token_Close_Paren)
@@ -247,7 +249,7 @@ parse_procedure_header(Parser *p, LinkedList *params, AstExpr **return_type, boo
 
       LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
-      linked_list_insert_last(params, node);
+      linked_list_insert_last(&result.params, node);
 
       tt = peek_token(&p->lexer);
       if (tt != Token_End_Of_File && tt != Token_Close_Paren)
@@ -262,7 +264,7 @@ parse_procedure_header(Parser *p, LinkedList *params, AstExpr **return_type, boo
   if (peek_token(&p->lexer) == Token_Arrow)
     {
       advance_token(&p->lexer);
-      *return_type = parse_type(p);
+      result.return_type = parse_type(p);
     }
   else
     {
@@ -274,8 +276,10 @@ parse_procedure_header(Parser *p, LinkedList *params, AstExpr **return_type, boo
           } },
         .line_info = { 0 }, // TODO: put line info here.
       };
-      *return_type = type;
+      result.return_type = type;
     }
+
+  return result;
 }
 
 LinkedList
@@ -509,18 +513,13 @@ parse_highest_prec_base(Parser *p)
       }
     case Expr_Start_Procedure_Type:
       {
-        LinkedList params = { 0 };
-        AstExpr *return_type = NULL;
-        parse_procedure_header(p, &params, &return_type, false);
+        AstExprTypeProc type = parse_type_proc(p, false);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Proc,
-              .as = { .Proc = {
-                  .params = params,
-                  .return_type = return_type,
-                } } } },
+              .as = { .Proc = type } } },
           .line_info = token.line_info,
         };
         return expr;
@@ -879,9 +878,7 @@ parse_symbol(Parser *p)
 
         push_scope(p);
 
-        LinkedList params = { 0 };
-        AstExpr *return_type = NULL;
-        parse_procedure_header(p, &params, &return_type, true);
+        AstExprTypeProc type = parse_type_proc(p, true);
         AstStmtBlock block = parse_stmt_block(p);
 
         pop_scope(p);
@@ -890,8 +887,7 @@ parse_symbol(Parser *p)
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Procedure,
           .as = { .Procedure = {
-              .params = params,
-              .return_type = return_type,
+              .type = type,
               .block = block,
             } },
           .name = id_token.text,

@@ -38,11 +38,17 @@ struct AstSymbolParameter
   bool has_name;
 };
 
-typedef struct AstSymbolProcedure AstSymbolProcedure;
-struct AstSymbolProcedure
+typedef struct AstExprTypeProc AstExprTypeProc;
+struct AstExprTypeProc
 {
   LinkedList params;
   AstExpr *return_type;
+};
+
+typedef struct AstSymbolProcedure AstSymbolProcedure;
+struct AstSymbolProcedure
+{
+  AstExprTypeProc type;
   AstStmtBlock block;
 };
 
@@ -96,9 +102,9 @@ enum AstSymbolTag
     Ast_Symbol_Parameter,
     Ast_Symbol_Procedure,
     Ast_Symbol_Type,
-    Ast_Symbol_Alias,
     Ast_Symbol_Struct_Field,
     Ast_Symbol_Enum_Value,
+    Ast_Symbol_Alias,
   };
 typedef enum AstSymbolTag AstSymbolTag;
 
@@ -166,13 +172,6 @@ struct AstExprTypeInt
 {
   u16 bits;
   bool is_signed;
-};
-
-typedef struct AstExprTypeProc AstExprTypeProc;
-struct AstExprTypeProc
-{
-  LinkedList params;
-  AstExpr *return_type;
 };
 
 typedef struct AstExprCall AstExprCall;
