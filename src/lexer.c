@@ -1,6 +1,24 @@
-#define PRINT_ERROR0(filepath, line_info, message) fprintf(stderr, "%s:%zu:%zu: error: " message "\n", filepath, (line_info).line, (line_info).column)
-#define PRINT_ERROR(filepath, line_info, message, ...) fprintf(stderr, "%s:%zu:%zu: error: " message "\n", filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
-#define PRINT_NOTE0(filepath, line_info, message) fprintf(stderr, "%s:%zu:%zu: note: " message "\n", filepath, (line_info).line, (line_info).column)
+#ifdef NDEBUG
+#define EXIT_ERROR() exit(EXIT_FAILURE)
+#else
+#define EXIT_ERROR() do { assert(false); exit(EXIT_FAILURE); } while (0)
+#endif
+
+#define ERROR_HEADER "%s:%zu:%zu: error: "
+#define NOTE_HEADER "%s:%zu:%zu: note: "
+
+#define PRINT_ERROR0_LN(filepath, line_info, message) fprintf(stderr, ERROR_HEADER message "\n", filepath, (line_info).line, (line_info).column)
+#define PRINT_ERROR_LN(filepath, line_info, message, ...) fprintf(stderr, ERROR_HEADER message "\n", filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
+#define PRINT_NOTE0_LN(filepath, line_info, message) fprintf(stderr, NOTE_HEADER message "\n", filepath, (line_info).line, (line_info).column)
+#define PRINT_NOTE_LN(filepath, line_info, message, ...) fprintf(stderr, NOTE_HEADER message "\n", filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
+
+#define PRINT_ERROR0(filepath, line_info, message) fprintf(stderr, ERROR_HEADER message, filepath, (line_info).line, (line_info).column)
+#define PRINT_ERROR(filepath, line_info, message, ...) fprintf(stderr, ERROR_HEADER message, filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
+#define PRINT_NOTE0(filepath, line_info, message) fprintf(stderr, NOTE_HEADER message, filepath, (line_info).line, (line_info).column)
+#define PRINT_NOTE(filepath, line_info, message, ...) fprintf(stderr, NOTE_HEADER message, filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
+
+#define EPRINT0(message) fprintf(stderr, message)
+#define EPRINT(message, ...) fprintf(stderr, message, __VA_ARGS__)
 
 typedef struct LineInfo LineInfo;
 struct LineInfo
@@ -277,8 +295,8 @@ buffer_token(Lexer *lexer)
             }
         }
 
-      PRINT_ERROR(lexer->filepath, lexer->line_info, "unrecognized character '%c'", text[at]);
-      exit(EXIT_FAILURE);
+      PRINT_ERROR_LN(lexer->filepath, lexer->line_info, "unrecognized character '%c'", text[at]);
+      EXIT_ERROR();
     }
 
  push_token:
@@ -413,8 +431,8 @@ expect_token(Lexer *lexer, TokenTag expected)
   if (peek_token(lexer) != expected)
     {
       Token token = grab_token(lexer);
-      PRINT_ERROR(lexer->filepath, token.line_info, "expected %s, but got '%.*s'", token_tag_to_string(expected), FORMAT_STRING_VIEW(token.text));
-      exit(EXIT_FAILURE);
+      PRINT_ERROR_LN(lexer->filepath, token.line_info, "expected %s, but got '%.*s'", token_tag_to_string(expected), FORMAT_STRING_VIEW(token.text));
+      EXIT_ERROR();
     }
 
   advance_token(lexer);

@@ -23,10 +23,9 @@ find_symbol(Ast *ast, StringView name, Scope *scope, LineInfo line_info)
             case Ast_Symbol_Procedure:
             case Ast_Symbol_Type:
             case Ast_Symbol_Alias:
-              return symbol;
             case Ast_Symbol_Struct_Field:
             case Ast_Symbol_Enum_Value:
-              UNREACHABLE();
+              return symbol;
             }
         }
 
@@ -36,8 +35,8 @@ find_symbol(Ast *ast, StringView name, Scope *scope, LineInfo line_info)
     }
   while (true);
 
-  PRINT_ERROR(ast->filepath, line_info, "symbol '%.*s' is not defined", FORMAT_STRING_VIEW(name));
-  exit(EXIT_FAILURE);
+  PRINT_ERROR_LN(ast->filepath, line_info, "symbol '%.*s' is not defined", FORMAT_STRING_VIEW(name));
+  EXIT_ERROR();
 }
 
 void resolve_identifiers_expr(Ast *, AstExpr **);
@@ -83,7 +82,6 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
   AstExpr *expr = *expr_ptr;
 
   assert(expr->tag == Ast_Expr_Type);
-
   AstExprType *Type = &expr->as.Type;
 
   switch (Type->tag)
@@ -91,6 +89,7 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
     case Ast_Expr_Type_Void:
     case Ast_Expr_Type_Bool:
     case Ast_Expr_Type_Int:
+    case Ast_Expr_Type_Generic_Int:
       break;
     case Ast_Expr_Type_Pointer:
       resolve_identifiers_expr(ast, &Type->as.Pointer);
@@ -132,13 +131,23 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       {
         AstSymbolEnum *Enum = &Type->as.Enum;
 
+        AstSymbol *last_initialized_enum_value = NULL;
+
         for (LinkedListNode *node = Enum->values.first; node; node = node->next)
           {
             AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
             AstSymbolEnumValue *Enum_Value = &symbol->as.Enum_Value;
+            assert(symbol->tag == Ast_Symbol_Enum_Value);
+
+            Enum_Value->type = expr;
 
             if (Enum_Value->expr)
-              resolve_identifiers_expr(ast, &Enum_Value->expr);
+              {
+                last_initialized_enum_value = symbol;
+                resolve_identifiers_expr(ast, &Enum_Value->expr);
+              }
+            else
+              Enum_Value->depends_on = last_initialized_enum_value;
           }
       }
 
@@ -221,6 +230,7 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
       {
         AstExprCall *Type_Cons = &expr->as.Type_Cons;
 
+        assert(!Type_Cons->lhs);
         resolve_identifiers_expr_list(ast, &Type_Cons->args);
       }
 
@@ -247,14 +257,6 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
       break;
     case Ast_Expr_Type:
       resolve_identifiers_type(ast, expr_ptr);
-      break;
-    case Ast_Expr_Designator:
-      {
-        AstExprDesignator *Designator = &expr->as.Designator;
-
-        resolve_identifiers_expr(ast, &Designator->expr);
-      }
-
       break;
     case Ast_Expr_Enum_Identifier:
       break;
@@ -288,6 +290,14 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
     case Ast_Expr_Bool:
     case Ast_Expr_Null:
       break;
+    case Ast_Expr_Designator:
+      {
+        AstExprDesignator *Designator = &expr->as.Designator;
+
+        resolve_identifiers_expr(ast, &Designator->expr);
+      }
+
+      break;
     case Ast_Expr_Symbol:
       UNREACHABLE();
     }
@@ -300,13 +310,13 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
 {
   switch (symbol->resolving_stage)
     {
-    case AST_SYMBOL_FLAG_NOT_RESOLVED:
-      symbol->resolving_stage = AST_SYMBOL_FLAG_BEING_RESOLVED;
+    case Ast_Symbol_Flag_Not_Resolved:
+      symbol->resolving_stage = Ast_Symbol_Flag_Being_Resolved;
       break;
-    case AST_SYMBOL_FLAG_BEING_RESOLVED:
-      PRINT_ERROR0(ast->filepath, symbol->line_info, "detected cyclic reference");
-      exit(EXIT_FAILURE);
-    case AST_SYMBOL_FLAG_IS_RESOLVED:
+    case Ast_Symbol_Flag_Being_Resolved:
+      PRINT_ERROR0_LN(ast->filepath, symbol->line_info, "detected cyclic reference");
+      EXIT_ERROR();
+    case Ast_Symbol_Flag_Is_Resolved:
       return;
     }
 
@@ -336,7 +346,7 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
       {
         AstSymbolProcedure *Procedure = &symbol->as.Procedure;
 
-        resolve_identifiers_type_proc(ast, &Procedure->type);
+        resolve_identifiers_type_proc(ast, &Procedure->type->as.Type.as.Proc);
         resolve_identifiers_stmt_block(ast, &Procedure->block);
       }
 
@@ -358,8 +368,8 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
 
         if (Alias->tag != Ast_Expr_Type)
           {
-            PRINT_ERROR0(ast->filepath, Alias->line_info, "exepected type, not expression");
-            exit(EXIT_FAILURE);
+            PRINT_ERROR0_LN(ast->filepath, Alias->line_info, "exepected type, not expression");
+            EXIT_ERROR();
           }
 
         symbol->tag = Ast_Symbol_Type;
@@ -374,7 +384,7 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
       UNREACHABLE();
     }
 
-  symbol->resolving_stage = AST_SYMBOL_FLAG_IS_RESOLVED;
+  symbol->resolving_stage = Ast_Symbol_Flag_Is_Resolved;
 }
 
 void

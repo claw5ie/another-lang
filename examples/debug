@@ -19,40 +19,45 @@ struct Faz
 alias Foo = i32;
 alias Poo = proc() -> void;
 
+proc dummy()
+{
+
+}
+
 proc foo(x :: bool, y :: i32) -> i32
 {
   proc baz()
   {
   }
-  return x;
+  return y;
 }
 
 proc main(bool, i32)
 {
   alias Foz = i32;
 
-  a :: Foo = _(x = 2);
+  a :: Foz = 32;
   b ::= Foo(x = 2);
 
   c :: struct{ x :: i32 };
   d :: enum{ x };
-  alias Foo = union{ x :: 42 };
+  alias Foo = union{ x :: i32 };
 
-  Foo.Hello;
-  foo.hello;
+  aa ::= Bar.Hello;
+  bb ::= b.x;
 
   if false
-  {
-    2 + 2;
-  }
+    {
+      aa ::= 2 + 2;
+    }
 
   switch true
     {
-    case 0 then
+    case false then
       {
-        2 + 2;
+        aa ::= 2 + 2;
       }
-    default 42;
+    default main(false, 0);
     }
 
   switch true
@@ -61,37 +66,38 @@ proc main(bool, i32)
 
   switch true
     {
-    default 42;
+    default main(false, 0);
     }
 
-  switch true
+  switch 42
     {
     case 0
     case 1
     case 2 then { }
-    default 42;
+    default main(false, 0);
     }
 
-  2 + 2 * 2;
-  (2 + 2) * 2;
-  -2 + --2;
-  !false && true || false;
-  1 <= 2;
-  (2+2)*2;
-  2*(2+2);
-  cast(2);
-  cast(void *, 2);
-  2 + cast(proc() -> void, 2,);
-  2 + cast(4);
+  cc ::= 2 + 2 * 2;
+  dd ::= (2 + 2) * 2;
+  ee ::= -2 + --2;
+  ff ::= !false && true || false;
+  gg ::= 1 <= 2;
+  hh ::= (2+2)*2;
+  ii ::= 2*(2+2);
+  // jj :: i32 = cast(2);
+  // cast(i32, cast(2)); // should pass type hint??
+  // cast(void *, 2);
+  // 2 + cast(proc() -> void, 2,);
+  // 2 + cast(4);
 
   if 2 + 2 then
     {
-      if 2 2;
+      if 2 dummy();
       2 = 2;
     }
   else
     {
-      4 * 4;
+      aa ::= 4 * 4;
     }
 
   while false do
@@ -110,25 +116,22 @@ proc main(bool, i32)
 
   i :: i42 = 42;
   j :: i42* = &a;
-  k :: i42 = b**;
+  jp :: i42** = &j;
+  k :: i42 = jp**;
 
-  l :: i32[3] = _(42, _(42), 90);
-  ll :: Foo[3] = _(42, Foo(42), 90);
+  l :: i32[1][2] = _(_(2, 42));
+  ll :: Foo[3] = _(Foo(x = 42), _(x = 69));
 
-  a[2][42] = 42;
+  l[2][42] = 42;
 
   m :: proc(i32, hello :: bool);
   n :: proc(i32, hello :: bool) = null;
-
-  o ::= _(hello = 42);
+  u ::= &n;
 
   bar ::= main;
 
-  a();
-  (bar)(name = 42);
-  (o*)(2, 3, (4 - 4), _(2, 3));
-
-  foofaz();
+  (bar)(false, 42);
+  (u*)(42, false);
 
   return;
 }

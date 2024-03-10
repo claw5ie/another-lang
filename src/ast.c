@@ -1,3 +1,13 @@
+typedef struct AstExpr AstExpr;
+
+#define MAX_BITS_IN_INT 64
+
+typedef u8 AstFlagsType;
+#define AST_FLAG_IS_IN_LOOP 0x1
+#define AST_FLAG_REJECT_VOID_TYPE 0x2
+#define AST_FLAG_SKIP_CYCLE 0x4
+#define AST_FLAG_IS_TYPECHECKING_ENUM 0x8
+
 typedef struct Ast Ast;
 struct Ast
 {
@@ -5,10 +15,20 @@ struct Ast
   Arena arena;
   HashTable symbols;
   const char *filepath;
+
+  AstFlagsType flags;
+  AstExpr *return_type;
 };
 
+enum AstTypecheckingStage
+  {
+    Ast_Stage_Not_Typechecked = 0, // Make sure that is the default value.
+    Ast_Stage_Being_Typechecked,
+    Ast_Stage_Is_Typechecked,
+  };
+typedef enum AstTypecheckingStage AstTypecheckingStage;
+
 typedef struct AstSymbol AstSymbol;
-typedef struct AstExpr AstExpr;
 typedef LinkedList AstStmtBlock;
 
 typedef struct Scope Scope;
@@ -43,12 +63,13 @@ struct AstExprTypeProc
 {
   LinkedList params;
   AstExpr *return_type;
+  Scope *scope;
 };
 
 typedef struct AstSymbolProcedure AstSymbolProcedure;
 struct AstSymbolProcedure
 {
-  AstExprTypeProc type;
+  AstExpr *type;
   AstStmtBlock block;
 };
 
@@ -62,27 +83,31 @@ typedef struct AstSymbolStruct AstSymbolStruct;
 struct AstSymbolStruct
 {
   LinkedList fields;
+  Scope *scope;
 };
 
 typedef struct AstSymbolEnumValue AstSymbolEnumValue;
 struct AstSymbolEnumValue
 {
+  AstExpr *type; // Points to itself.
   AstExpr *expr;
+  AstSymbol *depends_on;
 };
 
 typedef struct AstSymbolEnum AstSymbolEnum;
 struct AstSymbolEnum
 {
   LinkedList values;
+  Scope *scope;
 };
 
-enum AstSymbolFlag
+enum AstSymbolResolvingStage
   {
-    AST_SYMBOL_FLAG_NOT_RESOLVED,
-    AST_SYMBOL_FLAG_BEING_RESOLVED,
-    AST_SYMBOL_FLAG_IS_RESOLVED,
+    Ast_Symbol_Flag_Not_Resolved,
+    Ast_Symbol_Flag_Being_Resolved,
+    Ast_Symbol_Flag_Is_Resolved,
   };
-typedef enum AstSymbolFlag AstSymbolFlag;
+typedef enum AstSymbolResolvingStage AstSymbolResolvingStage;
 
 typedef union AstSymbolData AstSymbolData;
 union AstSymbolData
@@ -95,6 +120,10 @@ union AstSymbolData
   AstSymbolEnumValue Enum_Value;
   AstExpr *Alias;
 };
+
+typedef u8 AstSymbolFlagsType;
+#define AST_SYMBOL_FLAG_IS_UNPACKED 0x1
+#define AST_SYMBOL_FLAG_VARIABLE_IS_TYPECHECKED 0x2
 
 enum AstSymbolTag
   {
@@ -114,11 +143,10 @@ struct AstSymbol
   AstSymbolData as;
   StringView name;
   LineInfo line_info;
-  AstSymbolFlag resolving_stage: 2;
-  u8 flags;
+  AstSymbolResolvingStage resolving_stage: 2;
+  AstTypecheckingStage typechecking_stage: 2;
+  AstSymbolFlagsType flags;
 };
-
-#define AST_SYMBOL_FLAG_IS_UNPACKED 0x1
 
 enum AstExprBinaryOpTag
   {
@@ -212,6 +240,7 @@ enum AstExprTypeTag
     Ast_Expr_Type_Void,
     Ast_Expr_Type_Bool,
     Ast_Expr_Type_Int,
+    Ast_Expr_Type_Generic_Int,
     Ast_Expr_Type_Pointer,
     Ast_Expr_Type_Proc,
     Ast_Expr_Type_Array,
@@ -263,6 +292,9 @@ union AstExprData
   AstExprIdentifier Identifier;
 };
 
+typedef u8 AstExprFlagsType;
+#define AST_EXPR_FLAG_IS_LVALUE 0x1
+
 enum AstExprTag
   {
     Ast_Expr_Binary_Op,
@@ -276,8 +308,8 @@ enum AstExprTag
     Ast_Expr_Type,
     Ast_Expr_Int64,
     Ast_Expr_Bool,
-    Ast_Expr_Designator,
     Ast_Expr_Null,
+    Ast_Expr_Designator,
     Ast_Expr_Symbol,
     Ast_Expr_Enum_Identifier,
     Ast_Expr_Identifier,
@@ -289,6 +321,8 @@ struct AstExpr
   AstExprTag tag;
   AstExprData as;
   LineInfo line_info;
+  AstTypecheckingStage typechecking_stage: 2;
+  AstExprFlagsType flags;
 };
 
 typedef struct AstStmt AstStmt;
@@ -368,3 +402,12 @@ struct AstStmt
   AstStmtData as;
   LineInfo line_info;
 };
+
+void *
+ast_malloc(Ast *ast, size_t size)
+{
+  void *data = arena_malloc(&ast->arena, size);
+  if (!data)
+    abort();
+  return data;
+}

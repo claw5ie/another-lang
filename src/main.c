@@ -33,7 +33,8 @@ typedef int64_t i64;
 #include "ast.c"
 #include "parser.c"
 #include "resolve-identifiers.c"
-#include "transpiler.c"
+#include "typechecker.c"
+// #include "transpiler.c"
 #include "debugging-stuff.c"
 
 int
@@ -41,7 +42,8 @@ main(void)
 {
   Ast ast = parse("examples/debug");
   resolve_identifiers(&ast);
-  transpile_to_c(&ast);
+  typecheck(&ast);
+  // transpile_to_c(&ast);
 
   return EXIT_SUCCESS;
 }

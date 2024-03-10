@@ -239,7 +239,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Bool:
       {
-        u64 Bool = expr->as.Bool;
+        bool Bool = expr->as.Bool;
 
         printf("%s", Bool ? "true" : "false");
       }
@@ -282,7 +282,6 @@ void
 transpile_to_c_type(AstExpr *expr, size_t ident)
 {
   assert(expr->tag == Ast_Expr_Type);
-
   AstExprType *Type = &expr->as.Type;
 
   if (Type->symbol)

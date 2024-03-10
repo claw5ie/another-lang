@@ -30,7 +30,7 @@ view_to_unsigned(StringView text)
 }
 
 #define LINKED_LIST_PUT_NODE_DATA(Type, node, node_data) *(Type *)(&(node)->data[0]) = node_data
-#define LINKED_LIST_GET_NODE_DATA(Type, node) *(Type *)(&(node)->data[0])
+#define LINKED_LIST_GET_NODE_DATA(Type, node) (*(Type *)(&(node)->data[0]))
 
 typedef struct LinkedListNode LinkedListNode;
 struct LinkedListNode
@@ -64,6 +64,27 @@ linked_list_insert_last(LinkedList *list, LinkedListNode *node)
       list->first = list->last = node;
       list->count = 1;
     }
+}
+
+void
+linked_list_remove_node(LinkedList *list, LinkedListNode *node)
+{
+  assert(list->count > 0);
+
+  --list->count;
+
+  LinkedListNode *next = node->next;
+  LinkedListNode *prev = node->prev;
+
+  if (next)
+    next->prev = prev;
+  else
+    list->last = prev;
+
+  if (prev)
+    prev->next = next;
+  else
+    list->first = next;
 }
 
 #define ARENA_BLOCK_DEFAULT_CAPACITY (4 * 1024)

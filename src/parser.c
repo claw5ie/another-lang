@@ -1,5 +1,4 @@
 #define MAX_EXPR_COUNT 2
-#define MAX_SCOPE_COUNT 256
 
 typedef struct Parser Parser;
 struct Parser
@@ -10,8 +9,6 @@ struct Parser
 
   Scope *current_scope;
   Scope *global_scope;
-
-  AstExpr *exprs[MAX_EXPR_COUNT];
 };
 
 // Helps keep in sync 'parse_highest_prec_base' with 'parse_highest_prec'.
@@ -94,9 +91,9 @@ insert_symbol(Parser *p, Token *id_token)
 
   if (!was_inserted)
     {
-      PRINT_ERROR(p->lexer.filepath, id_token->line_info, "symbol '%.*s' is already defined", FORMAT_STRING_VIEW(symbol->name));
-      PRINT_NOTE0(p->lexer.filepath, symbol->line_info, "first defined here");
-      exit(EXIT_FAILURE);
+      PRINT_ERROR_LN(p->lexer.filepath, id_token->line_info, "symbol '%.*s' is already defined", FORMAT_STRING_VIEW(symbol->name));
+      PRINT_NOTE0_LN(p->lexer.filepath, symbol->line_info, "first defined here");
+      EXIT_ERROR();
     }
 
   return symbol;
@@ -218,7 +215,10 @@ parse_type_proc(Parser *p, bool insert_params_into_table)
 {
   expect_token(&p->lexer, Token_Open_Paren);
 
-  AstExprTypeProc result = { 0 };
+  AstExprTypeProc result = {
+    .scope = p->current_scope,
+  };
+
 
   TokenTag tt = peek_token(&p->lexer);
   while (tt != Token_End_Of_File && tt != Token_Close_Paren)
@@ -282,14 +282,15 @@ parse_type_proc(Parser *p, bool insert_params_into_table)
   return result;
 }
 
-LinkedList
+AstSymbolStruct
 parse_struct_fields(Parser *p)
 {
   expect_token(&p->lexer, Token_Open_Curly);
 
-  LinkedList fields = { 0 };
-
   push_scope(p);
+
+  LinkedList fields = { 0 };
+  Scope *scope = p->current_scope;
 
   // Should empty structs be allowed?
   TokenTag tt = peek_token(&p->lexer);
@@ -326,17 +327,23 @@ parse_struct_fields(Parser *p)
 
   expect_token(&p->lexer, Token_Close_Curly);
 
-  return fields;
+  AstSymbolStruct result = {
+    .fields = fields,
+    .scope = scope,
+  };
+
+  return result;
 }
 
-LinkedList
+AstSymbolEnum
 parse_enum_values(Parser *p)
 {
   expect_token(&p->lexer, Token_Open_Curly);
 
-  LinkedList fields = { 0 };
-
   push_scope(p);
+
+  LinkedList values = { 0 };
+  Scope *scope = p->current_scope;
 
   TokenTag tt = peek_token(&p->lexer);
   do
@@ -355,7 +362,9 @@ parse_enum_values(Parser *p)
       *symbol = (AstSymbol){
         .tag = Ast_Symbol_Enum_Value,
         .as = { .Enum_Value = {
+            .type = NULL,
             .expr = expr,
+            .depends_on = NULL,
           } },
         .name = id_token.text,
         .line_info = id_token.line_info,
@@ -363,7 +372,7 @@ parse_enum_values(Parser *p)
 
       LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
-      linked_list_insert_last(&fields, node);
+      linked_list_insert_last(&values, node);
 
       tt = peek_token(&p->lexer);
       if (tt != Token_End_Of_File && tt != Token_Close_Curly)
@@ -378,7 +387,12 @@ parse_enum_values(Parser *p)
 
   expect_token(&p->lexer, Token_Close_Curly);
 
-  return fields;
+  AstSymbolEnum result = {
+    .values = values,
+    .scope = scope,
+  };
+
+  return result;
 }
 
 ExprStartTag
@@ -410,7 +424,7 @@ can_token_start_expression(TokenTag tag)
 }
 
 size_t
-parse_fixed_size_arg_list(Parser *p)
+parse_fixed_size_arg_list(Parser *p, AstExpr *dst[MAX_EXPR_COUNT])
 {
   expect_token(&p->lexer, Token_Open_Paren);
 
@@ -421,7 +435,7 @@ parse_fixed_size_arg_list(Parser *p)
       AstExpr *expr = parse_expr(p);
 
       if (count < MAX_EXPR_COUNT)
-        p->exprs[count] = expr;
+        dst[count] = expr;
 
       tt = peek_token(&p->lexer);
       if (tt != Token_End_Of_File && tt != Token_Close_Paren)
@@ -447,8 +461,8 @@ parse_highest_prec_base(Parser *p)
     {
     case Expr_Start_None:
       {
-        PRINT_ERROR(p->lexer.filepath, token.line_info, "'%.*s' doesn't look like an expression", FORMAT_STRING_VIEW(token.text));
-        exit(EXIT_FAILURE);
+        PRINT_ERROR_LN(p->lexer.filepath, token.line_info, "'%.*s' doesn't look like an expression", FORMAT_STRING_VIEW(token.text));
+        EXIT_ERROR();
       }
     case Expr_Start_Double_Reference: // '&&expr' is not tokenized as '& & expr'.
       {
@@ -513,65 +527,64 @@ parse_highest_prec_base(Parser *p)
       }
     case Expr_Start_Procedure_Type:
       {
-        AstExprTypeProc type = parse_type_proc(p, false);
+        AstExprTypeProc Proc = parse_type_proc(p, false);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Proc,
-              .as = { .Proc = type } } },
+              .as = { .Proc = Proc },
+            } },
           .line_info = token.line_info,
         };
         return expr;
       }
     case Expr_Start_Unnamed_Struct_Type:
       {
-        LinkedList fields = parse_struct_fields(p);
+        AstSymbolStruct Struct = parse_struct_fields(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Struct,
-              .as = { .Struct = {
-                  .fields = fields,
-                } } } },
+              .as = { .Struct = Struct },
+            } },
           .line_info = token.line_info,
         };
         return expr;
       }
     case Expr_Start_Unnamed_Union_Type:
       {
-        LinkedList fields = parse_struct_fields(p);
+        AstSymbolStruct Union = parse_struct_fields(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Union,
-              .as = { .Union = {
-                  .fields = fields,
-                } } } },
+              .as = { .Union = Union },
+            } },
           .line_info = token.line_info,
         };
         return expr;
       }
     case Expr_Start_Unnamed_Enum_Type:
       {
-        LinkedList values = parse_enum_values(p);
+        AstSymbolEnum Enum = parse_enum_values(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Enum,
-              .as = { .Enum = {
-                  .values = values,
-                } } } },
+              .as = { .Enum = Enum },
+            } },
           .line_info = token.line_info,
         };
         return expr;
       }
     case Expr_Start_Cast:
       {
-        size_t count = parse_fixed_size_arg_list(p);
+        AstExpr *args[MAX_EXPR_COUNT];
+        size_t count = parse_fixed_size_arg_list(p, args);
 
         switch (count)
           {
@@ -580,7 +593,7 @@ parse_highest_prec_base(Parser *p)
               AstExpr *expr = parser_malloc(p, sizeof(*expr));
               *expr = (AstExpr){
                 .tag = Ast_Expr_Cast1,
-                .as = { .Cast1 = p->exprs[0] },
+                .as = { .Cast1 = args[0] },
                 .line_info = token.line_info,
               };
               return expr;
@@ -591,8 +604,8 @@ parse_highest_prec_base(Parser *p)
               *expr = (AstExpr){
                 .tag = Ast_Expr_Cast2,
                 .as = { .Cast2 = {
-                    .type = p->exprs[0],
-                    .expr = p->exprs[1],
+                    .type = args[0],
+                    .expr = args[1],
                   } },
                 .line_info = token.line_info,
               };
@@ -601,8 +614,8 @@ parse_highest_prec_base(Parser *p)
           default:
             {
               // Don't actually need to exit here? But need to return something.
-              PRINT_ERROR(p->lexer.filepath, token.line_info, "expected 1 or 2 arguments, not %zu", count);
-              exit(EXIT_FAILURE);
+              PRINT_ERROR_LN(p->lexer.filepath, token.line_info, "expected 1 or 2 arguments, not %zu", count);
+              EXIT_ERROR();
             }
           }
       }
@@ -878,11 +891,20 @@ parse_symbol(Parser *p)
 
         push_scope(p);
 
-        AstExprTypeProc type = parse_type_proc(p, true);
+        AstExprTypeProc Proc = parse_type_proc(p, true);
         AstStmtBlock block = parse_stmt_block(p);
 
         pop_scope(p);
 
+        AstExpr *type = parser_malloc(p, sizeof(*type));
+        *type = (AstExpr){
+          .tag = Ast_Expr_Type,
+          .as = { .Type = {
+              .tag = Ast_Expr_Type_Proc,
+              .as = { .Proc = Proc },
+            } },
+          .line_info = id_token.line_info,
+        };
         AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
           .tag = Ast_Symbol_Procedure,
@@ -902,16 +924,14 @@ parse_symbol(Parser *p)
 
         Token id_token = grab_token(&p->lexer);
         expect_token(&p->lexer, Token_Identifier);
-        LinkedList fields = parse_struct_fields(p);
+        AstSymbolStruct Struct = parse_struct_fields(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
         *type = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Struct,
-              .as = { .Struct = {
-                  .fields = fields,
-                } },
+              .as = { .Struct = Struct },
             } },
           .line_info = id_token.line_info,
         };
@@ -931,16 +951,14 @@ parse_symbol(Parser *p)
 
         Token id_token = grab_token(&p->lexer);
         expect_token(&p->lexer, Token_Identifier);
-        LinkedList fields = parse_struct_fields(p);
+        AstSymbolStruct Union = parse_struct_fields(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
         *type = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Union,
-              .as = { .Union = {
-                  .fields = fields,
-                } },
+              .as = { .Union = Union },
             } },
           .line_info = id_token.line_info,
         };
@@ -960,16 +978,14 @@ parse_symbol(Parser *p)
 
         Token id_token = grab_token(&p->lexer);
         expect_token(&p->lexer, Token_Identifier);
-        LinkedList values = parse_enum_values(p);
+        AstSymbolEnum Enum = parse_enum_values(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
         *type = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Enum,
-              .as = { .Enum = {
-                  .values = values,
-                } },
+              .as = { .Enum = Enum },
             } },
           .line_info = id_token.line_info,
         };
@@ -1349,8 +1365,8 @@ parse_stmt_but_not_symbol(Parser *p)
   AstStmt stmt = parse_stmt(p);
   if (stmt.tag == Ast_Stmt_Symbol)
     {
-      PRINT_ERROR0(p->lexer.filepath, stmt.line_info, "can't define variables here");
-      exit(EXIT_FAILURE);
+      PRINT_ERROR0_LN(p->lexer.filepath, stmt.line_info, "can't define variables here");
+      EXIT_ERROR();
     }
   return stmt;
 }
@@ -1393,8 +1409,8 @@ parse(const char *filepath)
       if (!symbol)
         {
           Token token = grab_token(&parser.lexer);
-          PRINT_ERROR0(parser.lexer.filepath, token.line_info, "expected symbol definition");
-          exit(EXIT_FAILURE);
+          PRINT_ERROR0_LN(parser.lexer.filepath, token.line_info, "expected symbol definition");
+          EXIT_ERROR();
         }
       LinkedListNode *node = parser_malloc(&parser, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);

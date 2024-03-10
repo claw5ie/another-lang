@@ -90,3 +90,9 @@ murmur2_hash(const void *data, size_t size)
 {
   return MurmurHash64A(data, size, 0xBEEFCAFEDEADE621);
 }
+
+u16
+max_u16(u16 x, u16 y)
+{
+  return x > y ? x : y;
+}
