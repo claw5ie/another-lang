@@ -84,11 +84,11 @@ proc main(bool, i32)
   gg ::= 1 <= 2;
   hh ::= (2+2)*2;
   ii ::= 2*(2+2);
-  // jj :: i32 = cast(2);
-  // cast(i32, cast(2)); // should pass type hint??
-  // cast(void *, 2);
-  // 2 + cast(proc() -> void, 2,);
-  // 2 + cast(4);
+  jj :: i32 = cast(2);
+  kk ::= cast(i32, 2); // should pass type hint??
+  ll ::= cast(void *, 2);
+  mm ::= 2 + cast(proc() -> void, 2,);
+  nn ::= 2 + cast(4);
 
   if 2 + 2 then
     {
@@ -119,10 +119,13 @@ proc main(bool, i32)
   jp :: i42** = &j;
   k :: i42 = jp**;
 
-  l :: i32[1][2] = _(_(2, 42));
-  ll :: Foo[3] = _(Foo(x = 42), _(x = 69));
+  xs :: i32[1][2] = _(_(2, 42));
+  xxs :: Foo[3] = _(Foo(x = 42), _(x = 69));
 
-  l[2][42] = 42;
+  xs[2][42] = 42;
+
+  oo :: struct { x :: i32 } = _(x = 42);
+  pp ::= oo;
 
   m :: proc(i32, hello :: bool);
   n :: proc(i32, hello :: bool) = null;

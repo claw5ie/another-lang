@@ -138,7 +138,48 @@ can_cast_to_type(AstExpr *to_cast, AstExpr *type)
 {
   assert(to_cast->tag == Ast_Expr_Type && type->tag == Ast_Expr_Type);
 
-  // TODO:
+  AstExprType *To_Cast = &to_cast->as.Type;
+  AstExprType *Type = &type->as.Type;
+
+  switch (To_Cast->tag)
+    {
+    case Ast_Expr_Type_Void:
+      return Type->tag == Ast_Expr_Type_Void;
+    case Ast_Expr_Type_Bool:
+    case Ast_Expr_Type_Int:
+    case Ast_Expr_Type_Generic_Int:
+    case Ast_Expr_Type_Pointer:
+    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Enum:
+      switch (Type->tag)
+        {
+        case Ast_Expr_Type_Bool:
+        case Ast_Expr_Type_Int:
+        case Ast_Expr_Type_Generic_Int:
+        case Ast_Expr_Type_Pointer:
+        case Ast_Expr_Type_Proc:
+        case Ast_Expr_Type_Enum:
+          return true;
+        case Ast_Expr_Type_Array:
+          return To_Cast->tag == Ast_Expr_Type_Pointer;
+        default:
+          return false;
+        }
+    case Ast_Expr_Type_Array:
+      switch (Type->tag)
+        {
+        case Ast_Expr_Type_Pointer:
+        case Ast_Expr_Type_Array:
+          return true;
+        default:
+          return false;
+        }
+    case Ast_Expr_Type_Struct:
+    case Ast_Expr_Type_Union:
+      // Can't we rely on symbol being set properly? Or that pointers point to the same type?
+      return To_Cast->symbol ? (To_Cast->symbol == Type->symbol) : (to_cast == type);
+    }
+
   UNREACHABLE();
 }
 
@@ -221,6 +262,7 @@ are_int_types_compatible(AstExprType *dst, AstExpr *lhs_type, AstExpr *rhs_type)
         default:
           ok = false;
         }
+
       break;
     case Ast_Expr_Type_Generic_Int:
       result = *Rhs_Type;
@@ -312,7 +354,7 @@ are_types_equal(AstExpr *lhs_type, AstExpr *rhs_type)
     case Ast_Expr_Type_Struct:
     case Ast_Expr_Type_Union:
     case Ast_Expr_Type_Enum:
-      return false;
+      return lhs_type == rhs_type;
     }
 
   UNREACHABLE();
