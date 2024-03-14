@@ -1,16 +1,18 @@
 #define TAB_SPACE 2
 #define PUTS(string) fputs(string, stdout)
 
+void transpile_to_c_expr(AstExpr *, size_t);
+void transpile_to_c_type_with_symbol(AstExpr *, AstSymbol *, size_t);
+void transpile_to_c_type(AstExpr *, size_t);
+void transpile_to_c_inner_type(AstExprType *, AstSymbol *, size_t);
+void transpile_to_c_stmt_block(AstStmtBlock *, size_t);
+
 void
 put_spaces(size_t count)
 {
   while (count-- > 0)
     PUTS(" ");
 }
-
-void transpile_to_c_expr(AstExpr *, size_t);
-void transpile_to_c_type(AstExpr *, size_t);
-void transpile_to_c_inner_type(AstExprType *, size_t);
 
 void
 transpile_to_c_expr_list(LinkedList *list, size_t ident)
@@ -26,7 +28,7 @@ transpile_to_c_expr_list(LinkedList *list, size_t ident)
 }
 
 void
-transpile_to_c_type_proc(AstExprTypeProc *proc, size_t ident)
+transpile_to_c_type_proc_params(AstExprTypeProc *proc, size_t ident)
 {
   PUTS("(");
   for (LinkedListNode *node = proc->params.first; node; node = node->next)
@@ -41,8 +43,7 @@ transpile_to_c_type_proc(AstExprTypeProc *proc, size_t ident)
       if (node->next)
         PUTS(", ");
     }
-  PUTS(") -> ");
-  transpile_to_c_expr(proc->return_type, ident);
+  PUTS(")");
 }
 
 void
@@ -249,7 +250,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       {
         AstExprDesignator *Designator = &expr->as.Designator;
 
-        printf("%.*s = ", FORMAT_STRING_VIEW(Designator->name));
+        printf(".%.*s = ", FORMAT_STRING_VIEW(Designator->name));
         transpile_to_c_expr(Designator->expr, ident);
       }
 
@@ -279,7 +280,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
 }
 
 void
-transpile_to_c_type(AstExpr *expr, size_t ident)
+transpile_to_c_type_with_symbol(AstExpr *expr, AstSymbol *symbol, size_t ident)
 {
   assert(expr->tag == Ast_Expr_Type);
   AstExprType *Type = &expr->as.Type;
@@ -287,15 +288,25 @@ transpile_to_c_type(AstExpr *expr, size_t ident)
   if (Type->symbol)
     {
       printf("%.*s", FORMAT_STRING_VIEW(Type->symbol->name));
-      return;
-    }
 
-  transpile_to_c_inner_type(Type, ident);
+      if (symbol)
+        printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+    }
+  else
+    transpile_to_c_inner_type(Type, symbol, ident);
 }
 
 void
-transpile_to_c_inner_type(AstExprType *type, size_t ident)
+transpile_to_c_type(AstExpr *expr, size_t ident)
 {
+  transpile_to_c_type_with_symbol(expr, NULL, ident);
+}
+
+void
+transpile_to_c_inner_type(AstExprType *type, AstSymbol *symbol, size_t ident)
+{
+  bool should_print_symbol_name_in_the_end = true;
+
   switch (type->tag)
     {
     case Ast_Expr_Type_Void:
@@ -312,6 +323,9 @@ transpile_to_c_inner_type(AstExprType *type, size_t ident)
       }
 
       break;
+    case Ast_Expr_Type_Generic_Int:
+      PUTS("i64");
+      break;
     case Ast_Expr_Type_Pointer:
       transpile_to_c_type(type->as.Pointer, ident);
       PUTS("*");
@@ -320,8 +334,14 @@ transpile_to_c_inner_type(AstExprType *type, size_t ident)
       {
         AstExprTypeProc *Proc = &type->as.Proc;
 
-        PUTS("proc");
-        transpile_to_c_type_proc(Proc, ident);
+        transpile_to_c_type(Proc->return_type, ident);
+        PUTS(" (*");
+        if (symbol)
+          printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
+        PUTS(")");
+        transpile_to_c_type_proc_params(Proc, ident);
+
+        should_print_symbol_name_in_the_end = false;
       }
 
       break;
@@ -329,10 +349,14 @@ transpile_to_c_inner_type(AstExprType *type, size_t ident)
       {
         AstExprArrayAccess *Array = &type->as.Array;
 
-        transpile_to_c_type(Array->lhs, ident);
+        transpile_to_c_type(Array->lhs, symbol, ident);
+        if (symbol)
+          printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
         PUTS("[");
         transpile_to_c_expr(Array->index, ident);
         PUTS("]");
+
+        should_print_symbol_name_in_the_end = false;
       }
 
       break;
@@ -364,9 +388,10 @@ transpile_to_c_inner_type(AstExprType *type, size_t ident)
 
       break;
     }
-}
 
-void transpile_to_c_stmt_block(AstStmtBlock *, size_t);
+  if (should_print_symbol_name_in_the_end && symbol)
+    printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+}
 
 void
 transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
@@ -379,36 +404,13 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
 
         put_spaces(ident);
 
-        switch (((Variable->expr != NULL) << 1) | (Variable->type != NULL))
+        transpile_to_c_type_with_symbol(Variable->type, symbol, ident);
+        if (Variable->expr)
           {
-          case 1: // 0b01
-            {
-              transpile_to_c_expr(Variable->type, ident);
-              PUTS(" ");
-              printf("%.*s;", FORMAT_STRING_VIEW(symbol->name));
-            }
-
-            break;
-          case 2: // 0b10
-            {
-              printf("auto %.*s = ", FORMAT_STRING_VIEW(symbol->name));
-              transpile_to_c_expr(Variable->expr, ident);
-              PUTS(";");
-            }
-
-            break;
-          case 3: // 0b11
-            {
-              transpile_to_c_expr(Variable->type, ident);
-              PUTS(" ");
-              printf("%.*s = ", FORMAT_STRING_VIEW(symbol->name));
-              transpile_to_c_expr(Variable->expr, ident);
-              PUTS(";");
-            }
-
-            break;
-          default: UNREACHABLE();
+            PUTS(" = ");
+            transpile_to_c_expr(Variable->expr, ident);
           }
+        PUTS(";");
       }
 
       break;
@@ -416,18 +418,20 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
       {
         AstSymbolParameter *Parameter = &symbol->as.Parameter;
 
-        printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
-        transpile_to_c_expr(Parameter->type, ident);
+        transpile_to_c_type_with_symbol(Parameter->type, symbol, ident);
       }
 
       break;
     case Ast_Symbol_Procedure:
       {
         AstSymbolProcedure *Procedure = &symbol->as.Procedure;
+        AstExprTypeProc *Proc = &Procedure->type->as.Type.as.Proc;
+        assert(Procedure->type->tag == Ast_Expr_Type && Procedure->type->as.Type.tag == Ast_Expr_Type_Proc);
 
         put_spaces(ident);
-        printf("proc %.*s", FORMAT_STRING_VIEW(symbol->name));
-        transpile_to_c_type_proc(&Procedure->type, ident);
+        transpile_to_c_type(Proc->return_type, ident);
+        printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+        transpile_to_c_type_proc_params(Proc, ident);
         PUTS("\n");
         transpile_to_c_stmt_block(&Procedure->block, ident);
         PUTS("\n");
@@ -443,8 +447,8 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
           {
             put_spaces(ident);
             PUTS("typedef ");
-            transpile_to_c_inner_type(&Type->as.Type, ident);
-            printf(" %.*s;\n", FORMAT_STRING_VIEW(symbol->name));
+            transpile_to_c_inner_type(&Type->as.Type, symbol, ident);
+            PUTS(";\n");
           }
       }
 

@@ -46,6 +46,12 @@ AstExpr g_max_bits_int_type = {
     } },
 };
 
+AstExpr *typecheck_expr(Ast *, AstExpr *, AstExpr *);
+void typecheck_type(Ast *, AstExpr *);
+void typecheck_symbol(Ast *, AstSymbol *);
+void typecheck_stmt_block(Ast *, AstStmtBlock *);
+void eprint_type(AstExpr *expr);
+
 TypeFlagsType
 compare_type(AstExpr *type)
 {
@@ -360,10 +366,6 @@ are_types_equal(AstExpr *lhs_type, AstExpr *rhs_type)
   UNREACHABLE();
 }
 
-AstExpr *typecheck_expr(Ast *, AstExpr *, AstExpr *);
-void typecheck_type(Ast *, AstExpr *);
-void eprint_type(AstExpr *expr);
-
 void
 eprint_expr(AstExpr *expr)
 {
@@ -642,8 +644,6 @@ typecheck_struct_fields(Ast *ast, LinkedList *fields)
       typecheck_type(ast, Struct_Field->type);
     }
 }
-
-void typecheck_symbol(Ast *, AstSymbol *);
 
 void
 typecheck_type(Ast *ast, AstExpr *expr)
@@ -1451,8 +1451,6 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
   UNREACHABLE();
 }
-
-void typecheck_stmt_block(Ast *, AstStmtBlock *);
 
 void
 typecheck_symbol(Ast *ast, AstSymbol *symbol)
