@@ -38,9 +38,9 @@ typedef int64_t i64;
 #include "debugging-stuff.c"
 
 int
-main(void)
+main(int argc, char **argv)
 {
-  Ast ast = parse("examples/debug");
+  Ast ast = parse(argc <= 1 ? "examples/debug" : argv[1]);
   resolve_identifiers(&ast);
   typecheck(&ast);
   transpile_to_c(&ast);
