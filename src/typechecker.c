@@ -182,8 +182,7 @@ can_cast_to_type(AstExpr *to_cast, AstExpr *type)
         }
     case Ast_Expr_Type_Struct:
     case Ast_Expr_Type_Union:
-      // Can't we rely on symbol being set properly? Or that pointers point to the same type?
-      return To_Cast->symbol ? (To_Cast->symbol == Type->symbol) : (to_cast == type);
+      return to_cast == type;
     }
 
   UNREACHABLE();

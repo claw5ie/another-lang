@@ -7,6 +7,7 @@ typedef u8 AstFlagsType;
 #define AST_FLAG_REJECT_VOID_TYPE 0x2
 #define AST_FLAG_SKIP_CYCLE 0x4
 #define AST_FLAG_IS_TYPECHECKING_ENUM 0x8
+#define AST_FLAG_DONT_CAST_EXPR_LIST 0x10
 
 typedef struct Ast Ast;
 struct Ast
