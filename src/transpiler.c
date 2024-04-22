@@ -263,15 +263,8 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       }
 
       break;
-    case Ast_Expr_Enum_Identifier:
-      {
-        AstExprIdentifier *Enum_Identifier = &expr->as.Enum_Identifier;
-
-        printf(".%.*s", FORMAT_STRING_VIEW(Enum_Identifier->name));
-      }
-
-      break;
     case Ast_Expr_Cast1:
+    case Ast_Expr_Enum_Identifier:
     case Ast_Expr_Identifier:
       UNREACHABLE();
     }
