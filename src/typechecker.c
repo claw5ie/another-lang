@@ -1435,6 +1435,9 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
               if (ast->flags & AST_FLAG_IS_TYPECHECKING_ENUM)
                 typecheck_symbol(ast, symbol);
 
+              expr->tag = Ast_Expr_Symbol;
+              expr->as.Symbol = symbol;
+
               return type_hint;
             }
           default:
