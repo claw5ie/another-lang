@@ -50,7 +50,7 @@ AstExpr *typecheck_expr(Ast *, AstExpr *, AstExpr *);
 void typecheck_type(Ast *, AstExpr *);
 void typecheck_symbol(Ast *, AstSymbol *);
 void typecheck_stmt_block(Ast *, AstStmtBlock *);
-void eprint_type(AstExpr *expr);
+void eprint_type(AstExpr *);
 
 TypeFlagsType
 compare_type(AstExpr *type)

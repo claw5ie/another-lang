@@ -1,3 +1,7 @@
+// TODO: prefix enum values do avoid name collisions.
+//       round int types to closest power of two.
+//       add bit fields.
+
 #define TAB_SPACE 2
 #define PUTS(string) fputs(string, stdout)
 
