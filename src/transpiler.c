@@ -8,6 +8,7 @@
 
 void transpile_to_c_expr(AstExpr *, size_t);
 void transpile_to_c_type(AstExpr *, size_t);
+void transpile_to_c_stmt_block_no_curly(AstStmtBlock *, size_t);
 void transpile_to_c_stmt_block(AstStmtBlock *, size_t);
 
 // TODO: remove this.
@@ -587,8 +588,22 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
         PUTS("switch (");
         transpile_to_c_expr(Switch->cond, ident);
         PUTS(")\n");
-        transpile_to_c_stmt_block(&Switch->cases, ident + TAB_SPACE);
-        // Default case is always null for now.
+        ident += TAB_SPACE;
+        put_spaces(ident);
+        PUTS("{\n");
+        transpile_to_c_stmt_block_no_curly(&Switch->cases, ident);
+        if (Switch->default_case)
+          {
+            put_spaces(ident);
+            PUTS("default:\n");
+            ident += TAB_SPACE;
+            transpile_to_c_stmt(Switch->default_case, ident);
+            ident -= TAB_SPACE;
+          }
+        PUTS("\n");
+        put_spaces(ident);
+        PUTS("}");
+        ident -= TAB_SPACE;
       }
 
       break;
@@ -636,10 +651,8 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
 }
 
 void
-transpile_to_c_stmt_block(AstStmtBlock *block, size_t ident)
+transpile_to_c_stmt_block_no_curly(AstStmtBlock *block, size_t ident)
 {
-  put_spaces(ident);
-  PUTS("{\n");
   ident += TAB_SPACE;
   for (LinkedListNode *node = block->first; node; node = node->next)
     {
@@ -648,6 +661,14 @@ transpile_to_c_stmt_block(AstStmtBlock *block, size_t ident)
       PUTS("\n");
     }
   ident -= TAB_SPACE;
+}
+
+void
+transpile_to_c_stmt_block(AstStmtBlock *block, size_t ident)
+{
+  put_spaces(ident);
+  PUTS("{\n");
+  transpile_to_c_stmt_block_no_curly(block, ident);
   put_spaces(ident);
   PUTS("}");
 }

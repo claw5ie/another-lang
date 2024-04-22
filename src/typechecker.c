@@ -1673,7 +1673,7 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
         AstStmtSwitch *Switch = &stmt->as.Switch;
 
         AstExpr *cond_type = typecheck_expr(ast, NULL, Switch->cond);
-        AstStmt *default_stmt = NULL;
+        AstStmt *default_case = NULL;
 
         for (LinkedListNode *node = Switch->cases.first; node; node = node->next)
           {
@@ -1717,14 +1717,14 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
                     {
                       AstStmt *Default = substmt->as.Default;
 
-                      if (default_stmt)
+                      if (default_case)
                         {
                           PRINT_ERROR0_LN(ast->filepath, substmt->line_info, "default statement was already defined");
-                          PRINT_NOTE0_LN(ast->filepath, default_stmt->line_info, "first defined here");
+                          PRINT_NOTE0_LN(ast->filepath, default_case->line_info, "first defined here");
                           EXIT_ERROR();
                         }
 
-                      default_stmt = Default;
+                      default_case = Default;
                       linked_list_remove_node(&Switch->cases, node);
 
                       substmt = Default;
@@ -1738,12 +1738,13 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
             while (true);
           finish_going_through_cases:
 
-            // Unpack default statement.
-            // if (default_stmt)
-            //   default_stmt = substmt;
+            if (default_case)
+              default_case = substmt;
 
             typecheck_stmt(ast, substmt);
           }
+
+        Switch->default_case = default_case;
       }
 
       break;
