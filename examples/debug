@@ -149,4 +149,6 @@ proc foofaz()
   {
     x :: Foo*,
   }
+
+  a :: Foo;
 }
