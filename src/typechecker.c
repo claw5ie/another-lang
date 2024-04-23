@@ -450,7 +450,7 @@ eprint_expr(AstExpr *expr)
       break;
     case Ast_Expr_Call:
       {
-        AstExprCall *Call = &expr->as.Call;
+        AstExprCall *Call = &expr->as.Call_Or_Type_Cons;
 
         eprint_expr(Call->lhs);
         fputc('(', stderr);
@@ -468,7 +468,7 @@ eprint_expr(AstExpr *expr)
       break;
     case Ast_Expr_Type_Cons:
       {
-        AstExprCall *Type_Cons = &expr->as.Type_Cons;
+        AstExprCall *Type_Cons = &expr->as.Call_Or_Type_Cons;
 
         eprint_expr(Type_Cons->lhs);
         fputc('(', stderr);
@@ -724,7 +724,7 @@ typecheck_type(Ast *ast, AstExpr *expr)
       break;
     case Ast_Expr_Type_Struct:
       {
-        AstExprTypeStruct *Struct = &Type->as.Struct;
+        AstExprTypeStruct *Struct = &Type->as.Struct_Or_Union;
 
         typecheck_struct_fields(ast, &Struct->fields);
       }
@@ -732,7 +732,7 @@ typecheck_type(Ast *ast, AstExpr *expr)
       break;
     case Ast_Expr_Type_Union:
       {
-        AstExprTypeStruct *Union = &Type->as.Union;
+        AstExprTypeStruct *Union = &Type->as.Struct_Or_Union;
 
         typecheck_struct_fields(ast, &Union->fields);
       }
@@ -1090,7 +1090,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
       }
     case Ast_Expr_Call:
       {
-        AstExprCall *Call = &expr->as.Call;
+        AstExprCall *Call = &expr->as.Call_Or_Type_Cons;
 
         AstExpr *lhs_type = typecheck_expr(ast, NULL, Call->lhs);
 
@@ -1136,7 +1136,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
       }
     case Ast_Expr_Type_Cons:
       {
-        AstExprCall *Type_Cons = &expr->as.Type_Cons;
+        AstExprCall *Type_Cons = &expr->as.Call_Or_Type_Cons;
 
         if (!Type_Cons->lhs)
           {
@@ -1211,10 +1211,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
               return Lhs_Type;
             }
           case Ast_Expr_Type_Struct:
-            typecheck_struct(ast, &Lhs_Type->as.Type.as.Struct, &Type_Cons->args, expr->line_info);
+            typecheck_struct(ast, &Lhs_Type->as.Type.as.Struct_Or_Union, &Type_Cons->args, expr->line_info);
             return Lhs_Type;
           case Ast_Expr_Type_Union:
-            typecheck_struct(ast, &Lhs_Type->as.Type.as.Union, &Type_Cons->args, expr->line_info);
+            typecheck_struct(ast, &Lhs_Type->as.Type.as.Struct_Or_Union, &Type_Cons->args, expr->line_info);
             return Lhs_Type;
           case Ast_Expr_Type_Generic_Int:
             UNREACHABLE();
@@ -1271,10 +1271,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
                   switch (subtype->as.Type.tag)
                     {
                     case Ast_Expr_Type_Struct:
-                      scope = subtype->as.Type.as.Struct.scope;
-                      break;
                     case Ast_Expr_Type_Union:
-                      scope = subtype->as.Type.as.Union.scope;
+                      scope = subtype->as.Type.as.Struct_Or_Union.scope;
                       break;
                     default:
                       print_error(ast->filepath, expr->line_info, "expected pointer to 'struct'/'union', but got '");
@@ -1286,10 +1284,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
                 break;
               case Ast_Expr_Type_Struct:
-                scope = lhs_type->as.Type.as.Struct.scope;
-                break;
               case Ast_Expr_Type_Union:
-                scope = lhs_type->as.Type.as.Union.scope;
+                scope = lhs_type->as.Type.as.Struct_Or_Union.scope;
                 break;
               default:
                 print_error(ast->filepath, expr->line_info, "expected 'struct'/'union' or pointer to 'struct'/'union', but got '");

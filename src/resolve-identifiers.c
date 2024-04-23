@@ -113,7 +113,7 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       break;
     case Ast_Expr_Type_Struct:
       {
-        AstExprTypeStruct *Struct = &Type->as.Struct;
+        AstExprTypeStruct *Struct = &Type->as.Struct_Or_Union;
 
         resolve_identifiers_struct_fields(ast, &Struct->fields);
       }
@@ -121,7 +121,7 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       break;
     case Ast_Expr_Type_Union:
       {
-        AstExprTypeStruct *Union = &Type->as.Union;
+        AstExprTypeStruct *Union = &Type->as.Struct_Or_Union;
 
         resolve_identifiers_struct_fields(ast, &Union->fields);
       }
@@ -212,23 +212,19 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
       break;
     case Ast_Expr_Call:
       {
-        AstExprCall *Call = &expr->as.Call;
+        AstExprCall *Call = &expr->as.Call_Or_Type_Cons;
 
         resolve_identifiers_expr(ast, &Call->lhs);
         resolve_identifiers_expr_list(ast, &Call->args);
 
         if (Call->lhs->tag == Ast_Expr_Type)
-          {
-            AstExprCall tmp = *Call;
-            expr->tag = Ast_Expr_Type_Cons;
-            expr->as.Type_Cons = tmp;
-          }
+          expr->tag = Ast_Expr_Type_Cons;
       }
 
       break;
     case Ast_Expr_Type_Cons:
       {
-        AstExprCall *Type_Cons = &expr->as.Type_Cons;
+        AstExprCall *Type_Cons = &expr->as.Call_Or_Type_Cons;
 
         assert(!Type_Cons->lhs);
         resolve_identifiers_expr_list(ast, &Type_Cons->args);

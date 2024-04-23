@@ -169,8 +169,7 @@ union AstExprTypeData
   AstExpr *Pointer;
   AstExprTypeProc Proc;
   AstExprArrayAccess Array;
-  AstExprTypeStruct Struct;
-  AstExprTypeStruct Union;
+  AstExprTypeStruct Struct_Or_Union;
   AstExprTypeEnum Enum;
 };
 
@@ -279,8 +278,7 @@ union AstExprData
   AstExprBinaryOp Binary_Op;
   AstExprUnaryOp Unary_Op;
   AstExprArrayAccess Array_Access;
-  AstExprCall Call;
-  AstExprCall Type_Cons;
+  AstExprCall Call_Or_Type_Cons;
   AstExprFieldAccess Field_Access;
   AstExpr *Cast1;
   AstExprCast2 Cast2;

@@ -183,7 +183,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Call:
       {
-        AstExprCall *Call = &expr->as.Call;
+        AstExprCall *Call = &expr->as.Call_Or_Type_Cons;
 
         transpile_to_c_expr(Call->lhs, ident);
         put_string("(");
@@ -194,7 +194,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       break;
     case Ast_Expr_Type_Cons:
       {
-        AstExprCall *Type_Cons = &expr->as.Type_Cons;
+        AstExprCall *Type_Cons = &expr->as.Call_Or_Type_Cons;
 
         assert(Type_Cons->lhs);
 
@@ -354,7 +354,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
         printf("struct %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
       else
         {
-          AstExprTypeStruct *Struct = &Type->as.Struct;
+          AstExprTypeStruct *Struct = &Type->as.Struct_Or_Union;
 
           printf("struct\n");
           transpile_to_c_struct_fields(&Struct->fields, ident);
@@ -366,7 +366,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
         printf("union %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
       else
         {
-          AstExprTypeStruct *Union = &Type->as.Union;
+          AstExprTypeStruct *Union = &Type->as.Struct_Or_Union;
 
           printf("union\n");
           transpile_to_c_struct_fields(&Union->fields, ident);
@@ -461,7 +461,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
               {
               case Ast_Expr_Type_Struct:
                 {
-                  AstExprTypeStruct *Struct = &Expr_Type->as.Struct;
+                  AstExprTypeStruct *Struct = &Expr_Type->as.Struct_Or_Union;
 
                   printf("struct %.*s\n", FORMAT_STRING_VIEW(symbol->name));
                   transpile_to_c_struct_fields(&Struct->fields, ident);
@@ -471,7 +471,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
                 break;
               case Ast_Expr_Type_Union:
                 {
-                  AstExprTypeStruct *Union = &Expr_Type->as.Union;
+                  AstExprTypeStruct *Union = &Expr_Type->as.Struct_Or_Union;
 
                   printf("union %.*s\n", FORMAT_STRING_VIEW(symbol->name));
                   transpile_to_c_struct_fields(&Union->fields, ident);

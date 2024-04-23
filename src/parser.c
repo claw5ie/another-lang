@@ -554,7 +554,7 @@ parse_highest_prec_base(Parser *p)
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Struct,
-              .as = { .Struct = Struct },
+              .as = { .Struct_Or_Union = Struct },
             } },
           .line_info = token.line_info,
         };
@@ -568,7 +568,7 @@ parse_highest_prec_base(Parser *p)
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Union,
-              .as = { .Union = Union },
+              .as = { .Struct_Or_Union = Union },
             } },
           .line_info = token.line_info,
         };
@@ -713,7 +713,7 @@ parse_highest_prec_base(Parser *p)
             AstExpr *expr = parser_malloc(p, sizeof(*expr));
             *expr = (AstExpr){
               .tag = Ast_Expr_Type_Cons,
-              .as = { .Type_Cons = {
+              .as = { .Call_Or_Type_Cons = {
                   .lhs = NULL,
                   .args = expr_list,
                 } },
@@ -778,7 +778,7 @@ parse_highest_prec(Parser *p)
             AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
             *new_base = (AstExpr){
               .tag = Ast_Expr_Call,
-              .as = { .Call = {
+              .as = { .Call_Or_Type_Cons = {
                   .lhs = base,
                   .args = expr_list,
                 } },
@@ -938,7 +938,7 @@ parse_symbol(Parser *p)
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Struct,
-              .as = { .Struct = Struct },
+              .as = { .Struct_Or_Union = Struct },
             } },
           .line_info = id_token.line_info,
         };
@@ -965,7 +965,7 @@ parse_symbol(Parser *p)
           .tag = Ast_Expr_Type,
           .as = { .Type = {
               .tag = Ast_Expr_Type_Union,
-              .as = { .Union = Union },
+              .as = { .Struct_Or_Union = Union },
             } },
           .line_info = id_token.line_info,
         };
