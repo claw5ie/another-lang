@@ -59,14 +59,6 @@ struct AstSymbolParameter
   bool has_name;
 };
 
-typedef struct AstExprTypeProc AstExprTypeProc;
-struct AstExprTypeProc
-{
-  LinkedList params;
-  AstExpr *return_type;
-  Scope *scope;
-};
-
 typedef struct AstSymbolProcedure AstSymbolProcedure;
 struct AstSymbolProcedure
 {
@@ -80,26 +72,12 @@ struct AstSymbolStructField
   AstExpr *type;
 };
 
-typedef struct AstSymbolStruct AstSymbolStruct;
-struct AstSymbolStruct
-{
-  LinkedList fields;
-  Scope *scope;
-};
-
 typedef struct AstSymbolEnumValue AstSymbolEnumValue;
 struct AstSymbolEnumValue
 {
   AstExpr *type; // Points to itself.
   AstExpr *expr;
   AstSymbol *depends_on;
-};
-
-typedef struct AstSymbolEnum AstSymbolEnum;
-struct AstSymbolEnum
-{
-  LinkedList values;
-  Scope *scope;
 };
 
 enum AstSymbolResolvingStage
@@ -149,6 +127,76 @@ struct AstSymbol
   AstSymbolFlagsType flags;
 };
 
+typedef struct AstExprTypeInt AstExprTypeInt;
+struct AstExprTypeInt
+{
+  u16 bits;
+  bool is_signed;
+};
+
+typedef struct AstExprTypeProc AstExprTypeProc;
+struct AstExprTypeProc
+{
+  LinkedList params;
+  AstExpr *return_type;
+  Scope *scope;
+};
+
+typedef struct AstExprArrayAccess AstExprArrayAccess;
+struct AstExprArrayAccess
+{
+  AstExpr *lhs, *index;
+};
+
+typedef struct AstExprTypeStruct AstExprTypeStruct;
+struct AstExprTypeStruct
+{
+  LinkedList fields;
+  Scope *scope;
+};
+
+typedef struct AstExprTypeEnum AstExprTypeEnum;
+struct AstExprTypeEnum
+{
+  LinkedList values;
+  Scope *scope;
+};
+
+typedef union AstExprTypeData AstExprTypeData;
+union AstExprTypeData
+{
+  AstExprTypeInt Int;
+  AstExpr *Pointer;
+  AstExprTypeProc Proc;
+  AstExprArrayAccess Array;
+  AstExprTypeStruct Struct;
+  AstExprTypeStruct Union;
+  AstExprTypeEnum Enum;
+};
+
+enum AstExprTypeTag
+  {
+    Ast_Expr_Type_Void,
+    Ast_Expr_Type_Bool,
+    Ast_Expr_Type_Int,
+    Ast_Expr_Type_Generic_Int,
+    Ast_Expr_Type_Pointer,
+    Ast_Expr_Type_Proc,
+    Ast_Expr_Type_Array,
+    Ast_Expr_Type_Struct,
+    Ast_Expr_Type_Union,
+    Ast_Expr_Type_Enum,
+  };
+typedef enum AstExprTypeTag AstExprTypeTag;
+
+typedef struct AstExprType AstExprType;
+struct AstExprType
+{
+  AstExprTypeTag tag;
+  AstExprTypeData as;
+  AstSymbol *symbol;
+};
+
 enum AstExprBinaryOpTag
   {
     Ast_Expr_Binary_Op_Or,
@@ -190,19 +238,6 @@ struct AstExprUnaryOp
   AstExpr *subexpr;
 };
 
-typedef struct AstExprArrayAccess AstExprArrayAccess;
-struct AstExprArrayAccess
-{
-  AstExpr *lhs, *index;
-};
-
-typedef struct AstExprTypeInt AstExprTypeInt;
-struct AstExprTypeInt
-{
-  u16 bits;
-  bool is_signed;
-};
-
 typedef struct AstExprCall AstExprCall;
 struct AstExprCall
 {
@@ -222,41 +257,6 @@ struct AstExprCast2
 {
   AstExpr *type;
   AstExpr *expr;
-};
-
-typedef union AstExprTypeData AstExprTypeData;
-union AstExprTypeData
-{
-  AstExprTypeInt Int;
-  AstExpr *Pointer;
-  AstExprTypeProc Proc;
-  AstExprArrayAccess Array;
-  AstSymbolStruct Struct;
-  AstSymbolStruct Union;
-  AstSymbolEnum Enum;
-};
-
-enum AstExprTypeTag
-  {
-    Ast_Expr_Type_Void,
-    Ast_Expr_Type_Bool,
-    Ast_Expr_Type_Int,
-    Ast_Expr_Type_Generic_Int,
-    Ast_Expr_Type_Pointer,
-    Ast_Expr_Type_Proc,
-    Ast_Expr_Type_Array,
-    Ast_Expr_Type_Struct,
-    Ast_Expr_Type_Union,
-    Ast_Expr_Type_Enum,
-  };
-typedef enum AstExprTypeTag AstExprTypeTag;
-
-typedef struct AstExprType AstExprType;
-struct AstExprType
-{
-  AstExprTypeTag tag;
-  AstExprTypeData as;
-  AstSymbol *symbol;
 };
 
 typedef struct AstExprDesignator AstExprDesignator;

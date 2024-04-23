@@ -724,7 +724,7 @@ typecheck_type(Ast *ast, AstExpr *expr)
       break;
     case Ast_Expr_Type_Struct:
       {
-        AstSymbolStruct *Struct = &Type->as.Struct;
+        AstExprTypeStruct *Struct = &Type->as.Struct;
 
         typecheck_struct_fields(ast, &Struct->fields);
       }
@@ -732,7 +732,7 @@ typecheck_type(Ast *ast, AstExpr *expr)
       break;
     case Ast_Expr_Type_Union:
       {
-        AstSymbolStruct *Union = &Type->as.Union;
+        AstExprTypeStruct *Union = &Type->as.Union;
 
         typecheck_struct_fields(ast, &Union->fields);
       }
@@ -740,7 +740,7 @@ typecheck_type(Ast *ast, AstExpr *expr)
       break;
     case Ast_Expr_Type_Enum:
       {
-        AstSymbolEnum *Enum = &Type->as.Enum;
+        AstExprTypeEnum *Enum = &Type->as.Enum;
 
         ast->flags |= AST_FLAG_SKIP_CYCLE | AST_FLAG_IS_TYPECHECKING_ENUM;
 
@@ -761,7 +761,7 @@ typecheck_type(Ast *ast, AstExpr *expr)
 }
 
 void
-typecheck_struct(Ast *ast, AstSymbolStruct *Struct, LinkedList *args, LineInfo line_info)
+typecheck_struct(Ast *ast, AstExprTypeStruct *Struct, LinkedList *args, LineInfo line_info)
 {
   LinkedListNode *arg_node = args->first;
   while (arg_node)
@@ -1427,7 +1427,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
           {
           case Ast_Expr_Type_Enum:
             {
-              AstSymbolEnum *Enum = &type_hint->as.Type.as.Enum;
+              AstExprTypeEnum *Enum = &type_hint->as.Type.as.Enum;
 
               AstSymbol *symbol = find_symbol(ast, Enum_Identifier->name, Enum->scope, expr->line_info);
               assert(symbol->tag == Ast_Symbol_Enum_Value);

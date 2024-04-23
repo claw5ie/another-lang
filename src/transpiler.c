@@ -354,7 +354,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
         printf("struct %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
       else
         {
-          AstSymbolStruct *Struct = &Type->as.Struct;
+          AstExprTypeStruct *Struct = &Type->as.Struct;
 
           printf("struct\n");
           transpile_to_c_struct_fields(&Struct->fields, ident);
@@ -366,7 +366,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
         printf("union %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
       else
         {
-          AstSymbolStruct *Union = &Type->as.Union;
+          AstExprTypeStruct *Union = &Type->as.Union;
 
           printf("union\n");
           transpile_to_c_struct_fields(&Union->fields, ident);
@@ -378,7 +378,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
         printf("enum %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
       else
         {
-          AstSymbolEnum *Enum = &Type->as.Enum;
+          AstExprTypeEnum *Enum = &Type->as.Enum;
 
           printf("enum\n");
           transpile_to_c_enum_values(&Enum->values, ident + TAB_SIZE);
@@ -461,7 +461,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
               {
               case Ast_Expr_Type_Struct:
                 {
-                  AstSymbolStruct *Struct = &Expr_Type->as.Struct;
+                  AstExprTypeStruct *Struct = &Expr_Type->as.Struct;
 
                   printf("struct %.*s\n", FORMAT_STRING_VIEW(symbol->name));
                   transpile_to_c_struct_fields(&Struct->fields, ident);
@@ -471,7 +471,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
                 break;
               case Ast_Expr_Type_Union:
                 {
-                  AstSymbolStruct *Union = &Expr_Type->as.Union;
+                  AstExprTypeStruct *Union = &Expr_Type->as.Union;
 
                   printf("union %.*s\n", FORMAT_STRING_VIEW(symbol->name));
                   transpile_to_c_struct_fields(&Union->fields, ident);
@@ -481,7 +481,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
                 break;
               case Ast_Expr_Type_Enum:
                 {
-                  AstSymbolEnum *Enum = &Expr_Type->as.Enum;
+                  AstExprTypeEnum *Enum = &Expr_Type->as.Enum;
 
                   printf("enum %.*s\n", FORMAT_STRING_VIEW(symbol->name));
                   transpile_to_c_enum_values(&Enum->values, ident + TAB_SIZE);

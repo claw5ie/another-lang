@@ -289,7 +289,7 @@ parse_type_proc(Parser *p, bool insert_params_into_table)
   return result;
 }
 
-AstSymbolStruct
+AstExprTypeStruct
 parse_struct_fields(Parser *p)
 {
   expect_token(p, Token_Open_Curly);
@@ -334,7 +334,7 @@ parse_struct_fields(Parser *p)
 
   expect_token(p, Token_Close_Curly);
 
-  AstSymbolStruct result = {
+  AstExprTypeStruct result = {
     .fields = fields,
     .scope = scope,
   };
@@ -342,7 +342,7 @@ parse_struct_fields(Parser *p)
   return result;
 }
 
-AstSymbolEnum
+AstExprTypeEnum
 parse_enum_values(Parser *p)
 {
   expect_token(p, Token_Open_Curly);
@@ -394,7 +394,7 @@ parse_enum_values(Parser *p)
 
   expect_token(p, Token_Close_Curly);
 
-  AstSymbolEnum result = {
+  AstExprTypeEnum result = {
     .values = values,
     .scope = scope,
   };
@@ -548,7 +548,7 @@ parse_highest_prec_base(Parser *p)
       }
     case Expr_Start_Unnamed_Struct_Type:
       {
-        AstSymbolStruct Struct = parse_struct_fields(p);
+        AstExprTypeStruct Struct = parse_struct_fields(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
@@ -562,7 +562,7 @@ parse_highest_prec_base(Parser *p)
       }
     case Expr_Start_Unnamed_Union_Type:
       {
-        AstSymbolStruct Union = parse_struct_fields(p);
+        AstExprTypeStruct Union = parse_struct_fields(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
@@ -576,7 +576,7 @@ parse_highest_prec_base(Parser *p)
       }
     case Expr_Start_Unnamed_Enum_Type:
       {
-        AstSymbolEnum Enum = parse_enum_values(p);
+        AstExprTypeEnum Enum = parse_enum_values(p);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
@@ -931,7 +931,7 @@ parse_symbol(Parser *p)
 
         Token id_token = grab_token(p);
         expect_token(p, Token_Identifier);
-        AstSymbolStruct Struct = parse_struct_fields(p);
+        AstExprTypeStruct Struct = parse_struct_fields(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
         *type = (AstExpr){
@@ -958,7 +958,7 @@ parse_symbol(Parser *p)
 
         Token id_token = grab_token(p);
         expect_token(p, Token_Identifier);
-        AstSymbolStruct Union = parse_struct_fields(p);
+        AstExprTypeStruct Union = parse_struct_fields(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
         *type = (AstExpr){
@@ -985,7 +985,7 @@ parse_symbol(Parser *p)
 
         Token id_token = grab_token(p);
         expect_token(p, Token_Identifier);
-        AstSymbolEnum Enum = parse_enum_values(p);
+        AstExprTypeEnum Enum = parse_enum_values(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
         *type = (AstExpr){

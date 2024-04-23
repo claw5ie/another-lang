@@ -113,7 +113,7 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       break;
     case Ast_Expr_Type_Struct:
       {
-        AstSymbolStruct *Struct = &Type->as.Struct;
+        AstExprTypeStruct *Struct = &Type->as.Struct;
 
         resolve_identifiers_struct_fields(ast, &Struct->fields);
       }
@@ -121,7 +121,7 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       break;
     case Ast_Expr_Type_Union:
       {
-        AstSymbolStruct *Union = &Type->as.Union;
+        AstExprTypeStruct *Union = &Type->as.Union;
 
         resolve_identifiers_struct_fields(ast, &Union->fields);
       }
@@ -129,7 +129,7 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       break;
     case Ast_Expr_Type_Enum:
       {
-        AstSymbolEnum *Enum = &Type->as.Enum;
+        AstExprTypeEnum *Enum = &Type->as.Enum;
 
         AstSymbol *last_initialized_enum_value = NULL;
 
