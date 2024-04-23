@@ -1,5 +1,13 @@
 #define MAX_EXPR_COUNT 2
 
+#define grab_token(parser) lexer_grab_token(&(parser)->lexer)
+#define putback_token(parser, token) lexer_putback_token(&(parser)->lexer, token)
+#define peek_ahead_token(parser, index) lexer_peek_ahead_token(&(parser)->lexer, index)
+#define peek_token(parser) lexer_peek_token(&(parser)->lexer)
+#define advance_many_tokens(parser, count) lexer_advance_many_tokens(&(parser)->lexer, count)
+#define advance_token(parser) lexer_advance_token(&(parser)->lexer)
+#define expect_token(parser, expected_token)  lexer_expect_token(&(parser)->lexer, expected_token)
+
 typedef struct Parser Parser;
 struct Parser
 {
@@ -91,9 +99,9 @@ insert_symbol(Parser *p, Token *id_token)
 
   if (!was_inserted)
     {
-      PRINT_ERROR_LN(p->lexer.filepath, id_token->line_info, "symbol '%.*s' is already defined", FORMAT_STRING_VIEW(symbol->name));
-      PRINT_NOTE0_LN(p->lexer.filepath, symbol->line_info, "first defined here");
-      EXIT_ERROR();
+      print_error_many_ln(p->lexer.filepath, id_token->line_info, "symbol '%.*s' is already defined", FORMAT_STRING_VIEW(symbol->name));
+      print_note_ln(p->lexer.filepath, symbol->line_info, "first defined here");
+      exit_error();
     }
 
   return symbol;
@@ -166,19 +174,19 @@ parse_type(Parser *p)
 LinkedList
 parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
 {
-  expect_token(&p->lexer, start_list);
+  expect_token(p, start_list);
 
   LinkedList exprs = { 0 };
 
-  TokenTag tt = peek_token(&p->lexer);
+  TokenTag tt = peek_token(p);
   while (tt != Token_End_Of_File && tt != end_list)
     {
       AstExpr *expr = NULL;
 
-      if (tt == Token_Identifier && peek_ahead_token(&p->lexer, 1) == Token_Equal)
+      if (tt == Token_Identifier && peek_ahead_token(p, 1) == Token_Equal)
         {
-          Token token = grab_token(&p->lexer);
-          advance_many_tokens(&p->lexer, 2);
+          Token token = grab_token(p);
+          advance_many_tokens(p, 2);
           AstExpr *initializer = parse_expr(p);
           expr = parser_malloc(p, sizeof(*expr));
           *expr = (AstExpr){
@@ -197,15 +205,15 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
       LINKED_LIST_PUT_NODE_DATA(AstExpr *, node, expr);
       linked_list_insert_last(&exprs, node);
 
-      tt = peek_token(&p->lexer);
+      tt = peek_token(p);
       if (tt != Token_End_Of_File && tt != end_list)
         {
-          expect_token(&p->lexer, Token_Comma);
-          tt = peek_token(&p->lexer);
+          expect_token(p, Token_Comma);
+          tt = peek_token(p);
         }
     }
 
-  expect_token(&p->lexer, end_list);
+  expect_token(p, end_list);
 
   return exprs;
 }
@@ -213,23 +221,22 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
 AstExprTypeProc
 parse_type_proc(Parser *p, bool insert_params_into_table)
 {
-  expect_token(&p->lexer, Token_Open_Paren);
+  expect_token(p, Token_Open_Paren);
 
   AstExprTypeProc result = {
     .scope = p->current_scope,
   };
 
-
-  TokenTag tt = peek_token(&p->lexer);
+  TokenTag tt = peek_token(p);
   while (tt != Token_End_Of_File && tt != Token_Close_Paren)
     {
-      Token param_id_token = grab_token(&p->lexer);
+      Token param_id_token = grab_token(p);
       bool has_name = false;
 
-      if (peek_token(&p->lexer) == Token_Identifier
-          && peek_ahead_token(&p->lexer, 1) == Token_Double_Colon)
+      if (peek_token(p) == Token_Identifier
+          && peek_ahead_token(p, 1) == Token_Double_Colon)
         {
-          advance_many_tokens(&p->lexer, 2);
+          advance_many_tokens(p, 2);
           has_name = true;
         }
 
@@ -251,19 +258,19 @@ parse_type_proc(Parser *p, bool insert_params_into_table)
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
       linked_list_insert_last(&result.params, node);
 
-      tt = peek_token(&p->lexer);
+      tt = peek_token(p);
       if (tt != Token_End_Of_File && tt != Token_Close_Paren)
         {
-          expect_token(&p->lexer, Token_Comma);
-          tt = peek_token(&p->lexer);
+          expect_token(p, Token_Comma);
+          tt = peek_token(p);
         }
     }
 
-  expect_token(&p->lexer, Token_Close_Paren);
+  expect_token(p, Token_Close_Paren);
 
-  if (peek_token(&p->lexer) == Token_Arrow)
+  if (peek_token(p) == Token_Arrow)
     {
-      advance_token(&p->lexer);
+      advance_token(p);
       result.return_type = parse_type(p);
     }
   else
@@ -285,7 +292,7 @@ parse_type_proc(Parser *p, bool insert_params_into_table)
 AstSymbolStruct
 parse_struct_fields(Parser *p)
 {
-  expect_token(&p->lexer, Token_Open_Curly);
+  expect_token(p, Token_Open_Curly);
 
   push_scope(p);
 
@@ -293,12 +300,12 @@ parse_struct_fields(Parser *p)
   Scope *scope = p->current_scope;
 
   // Should empty structs be allowed?
-  TokenTag tt = peek_token(&p->lexer);
+  TokenTag tt = peek_token(p);
   while (tt != Token_End_Of_File && tt != Token_Close_Curly)
     {
-      Token id_token = grab_token(&p->lexer);
-      expect_token(&p->lexer, Token_Identifier);
-      expect_token(&p->lexer, Token_Double_Colon);
+      Token id_token = grab_token(p);
+      expect_token(p, Token_Identifier);
+      expect_token(p, Token_Double_Colon);
       AstExpr *type = parse_type(p);
 
       AstSymbol *symbol = insert_symbol(p, &id_token);
@@ -315,17 +322,17 @@ parse_struct_fields(Parser *p)
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
       linked_list_insert_last(&fields, node);
 
-      tt = peek_token(&p->lexer);
+      tt = peek_token(p);
       if (tt != Token_End_Of_File && tt != Token_Close_Curly)
         {
-          expect_token(&p->lexer, Token_Comma);
-          tt = peek_token(&p->lexer);
+          expect_token(p, Token_Comma);
+          tt = peek_token(p);
         }
     }
 
   pop_scope(p);
 
-  expect_token(&p->lexer, Token_Close_Curly);
+  expect_token(p, Token_Close_Curly);
 
   AstSymbolStruct result = {
     .fields = fields,
@@ -338,23 +345,23 @@ parse_struct_fields(Parser *p)
 AstSymbolEnum
 parse_enum_values(Parser *p)
 {
-  expect_token(&p->lexer, Token_Open_Curly);
+  expect_token(p, Token_Open_Curly);
 
   push_scope(p);
 
   LinkedList values = { 0 };
   Scope *scope = p->current_scope;
 
-  TokenTag tt = peek_token(&p->lexer);
+  TokenTag tt = peek_token(p);
   do
     {
-      Token id_token = grab_token(&p->lexer);
-      expect_token(&p->lexer, Token_Identifier);
+      Token id_token = grab_token(p);
+      expect_token(p, Token_Identifier);
       AstExpr *expr = NULL;
 
-      if (peek_token(&p->lexer) == Token_Equal)
+      if (peek_token(p) == Token_Equal)
         {
-          advance_token(&p->lexer);
+          advance_token(p);
           expr = parse_expr(p);
         }
 
@@ -374,18 +381,18 @@ parse_enum_values(Parser *p)
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
       linked_list_insert_last(&values, node);
 
-      tt = peek_token(&p->lexer);
+      tt = peek_token(p);
       if (tt != Token_End_Of_File && tt != Token_Close_Curly)
         {
-          expect_token(&p->lexer, Token_Comma);
-          tt = peek_token(&p->lexer);
+          expect_token(p, Token_Comma);
+          tt = peek_token(p);
         }
     }
   while (tt != Token_End_Of_File && tt != Token_Close_Curly);
 
   pop_scope(p);
 
-  expect_token(&p->lexer, Token_Close_Curly);
+  expect_token(p, Token_Close_Curly);
 
   AstSymbolEnum result = {
     .values = values,
@@ -426,10 +433,10 @@ can_token_start_expression(TokenTag tag)
 size_t
 parse_fixed_size_arg_list(Parser *p, AstExpr *dst[MAX_EXPR_COUNT])
 {
-  expect_token(&p->lexer, Token_Open_Paren);
+  expect_token(p, Token_Open_Paren);
 
   size_t count = 0;
-  TokenTag tt = peek_token(&p->lexer);
+  TokenTag tt = peek_token(p);
   for (; tt != Token_End_Of_File && tt != Token_Close_Paren; count++)
     {
       AstExpr *expr = parse_expr(p);
@@ -437,15 +444,15 @@ parse_fixed_size_arg_list(Parser *p, AstExpr *dst[MAX_EXPR_COUNT])
       if (count < MAX_EXPR_COUNT)
         dst[count] = expr;
 
-      tt = peek_token(&p->lexer);
+      tt = peek_token(p);
       if (tt != Token_End_Of_File && tt != Token_Close_Paren)
         {
-          expect_token(&p->lexer, Token_Comma);
-          tt = peek_token(&p->lexer);
+          expect_token(p, Token_Comma);
+          tt = peek_token(p);
         }
     }
 
-  expect_token(&p->lexer, Token_Close_Paren);
+  expect_token(p, Token_Close_Paren);
 
   return count;
 }
@@ -453,16 +460,16 @@ parse_fixed_size_arg_list(Parser *p, AstExpr *dst[MAX_EXPR_COUNT])
 AstExpr *
 parse_highest_prec_base(Parser *p)
 {
-  Token token = grab_token(&p->lexer);
-  advance_token(&p->lexer);
+  Token token = grab_token(p);
+  advance_token(p);
 
   ExprStartTag expr_start_tag = can_token_start_expression(token.tag);
   switch (expr_start_tag)
     {
     case Expr_Start_None:
       {
-        PRINT_ERROR_LN(p->lexer.filepath, token.line_info, "'%.*s' doesn't look like an expression", FORMAT_STRING_VIEW(token.text));
-        EXIT_ERROR();
+        print_error_many_ln(p->lexer.filepath, token.line_info, "'%.*s' doesn't look like an expression", FORMAT_STRING_VIEW(token.text));
+        exit_error();
       }
     case Expr_Start_Double_Reference: // '&&expr' is not tokenized as '& & expr'.
       {
@@ -507,13 +514,13 @@ parse_highest_prec_base(Parser *p)
     case Expr_Start_Parenthesized:
       {
         AstExpr *expr = parse_expr(p);
-        expect_token(&p->lexer, Token_Close_Paren);
+        expect_token(p, Token_Close_Paren);
         return expr;
       }
     case Expr_Start_Dot:
       {
-        Token id_token = grab_token(&p->lexer);
-        expect_token(&p->lexer, Token_Identifier);
+        Token id_token = grab_token(p);
+        expect_token(p, Token_Identifier);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Enum_Identifier,
@@ -614,8 +621,8 @@ parse_highest_prec_base(Parser *p)
           default:
             {
               // Don't actually need to exit here? But need to return something.
-              PRINT_ERROR_LN(p->lexer.filepath, token.line_info, "expected 1 or 2 arguments, not %zu", count);
-              EXIT_ERROR();
+              print_error_many_ln(p->lexer.filepath, token.line_info, "expected 1 or 2 arguments, not %zu", count);
+              exit_error();
             }
           }
       }
@@ -700,7 +707,7 @@ parse_highest_prec_base(Parser *p)
     case Expr_Start_Identifier:
       {
         if (token.text.count == 1 && token.text.data[0] == '_' &&
-            peek_token(&p->lexer) == Token_Open_Paren)
+            peek_token(p) == Token_Open_Paren)
           {
             LinkedList expr_list = parse_comma_separated_exprs(p, Token_Open_Paren, Token_Close_Paren);
             AstExpr *expr = parser_malloc(p, sizeof(*expr));
@@ -740,16 +747,16 @@ parse_highest_prec(Parser *p)
 
   do
     {
-      switch (peek_token(&p->lexer))
+      switch (peek_token(p))
         {
         case Token_Mul:
           {
-            TokenTag next = peek_ahead_token(&p->lexer, 1);
+            TokenTag next = peek_ahead_token(p, 1);
             if (can_token_start_expression(next) != Expr_Start_None)
               goto finish_parsing_postfix_unary_operators;
 
-            LineInfo line_info = grab_token(&p->lexer).line_info;
-            advance_token(&p->lexer);
+            LineInfo line_info = grab_token(p).line_info;
+            advance_token(p);
 
             AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
             *new_base = (AstExpr){
@@ -766,7 +773,7 @@ parse_highest_prec(Parser *p)
           break;
         case Token_Open_Paren:
           {
-            LineInfo line_info = grab_token(&p->lexer).line_info;
+            LineInfo line_info = grab_token(p).line_info;
             LinkedList expr_list = parse_comma_separated_exprs(p, Token_Open_Paren, Token_Close_Paren);
             AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
             *new_base = (AstExpr){
@@ -783,10 +790,10 @@ parse_highest_prec(Parser *p)
           break;
         case Token_Open_Bracket:
           {
-            LineInfo line_info = grab_token(&p->lexer).line_info;
-            advance_token(&p->lexer);
+            LineInfo line_info = grab_token(p).line_info;
+            advance_token(p);
             AstExpr *expr = parse_expr(p);
-            expect_token(&p->lexer, Token_Close_Bracket);
+            expect_token(p, Token_Close_Bracket);
 
             AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
             *new_base = (AstExpr){
@@ -803,10 +810,10 @@ parse_highest_prec(Parser *p)
           break;
         case Token_Dot:
           {
-            advance_token(&p->lexer);
+            advance_token(p);
 
-            Token token = grab_token(&p->lexer);
-            expect_token(&p->lexer, Token_Identifier);
+            Token token = grab_token(p);
+            expect_token(p, Token_Identifier);
 
             AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
             *new_base = (AstExpr){
@@ -835,7 +842,7 @@ AstExpr *
 parse_prec(Parser *p, int min_prec)
 {
   AstExpr *lhs = parse_highest_prec(p);
-  TokenTag op = peek_token(&p->lexer);
+  TokenTag op = peek_token(p);
   int curr_prec = prec_of_op(op);
   int prev_prec = INT_MAX;
 
@@ -843,7 +850,7 @@ parse_prec(Parser *p, int min_prec)
     {
       do
         {
-          advance_token(&p->lexer);
+          advance_token(p);
 
           AstExpr *rhs = parse_prec(p, curr_prec + 1);
           AstExpr *new_lhs = parser_malloc(p, sizeof(*new_lhs));
@@ -858,7 +865,7 @@ parse_prec(Parser *p, int min_prec)
           };
           lhs = new_lhs;
 
-          op = peek_token(&p->lexer);
+          op = peek_token(p);
         }
       while (curr_prec == prec_of_op(op));
 
@@ -880,14 +887,14 @@ AstStmtBlock parse_stmt_block(Parser *);
 AstSymbol *
 parse_symbol(Parser *p)
 {
-  switch (peek_token(&p->lexer))
+  switch (peek_token(p))
     {
     case Token_Proc:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
-        Token id_token = grab_token(&p->lexer);
-        expect_token(&p->lexer, Token_Identifier);
+        Token id_token = grab_token(p);
+        expect_token(p, Token_Identifier);
 
         push_scope(p);
 
@@ -920,10 +927,10 @@ parse_symbol(Parser *p)
       }
     case Token_Struct:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
-        Token id_token = grab_token(&p->lexer);
-        expect_token(&p->lexer, Token_Identifier);
+        Token id_token = grab_token(p);
+        expect_token(p, Token_Identifier);
         AstSymbolStruct Struct = parse_struct_fields(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
@@ -947,10 +954,10 @@ parse_symbol(Parser *p)
       }
     case Token_Union:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
-        Token id_token = grab_token(&p->lexer);
-        expect_token(&p->lexer, Token_Identifier);
+        Token id_token = grab_token(p);
+        expect_token(p, Token_Identifier);
         AstSymbolStruct Union = parse_struct_fields(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
@@ -974,10 +981,10 @@ parse_symbol(Parser *p)
       }
     case Token_Enum:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
-        Token id_token = grab_token(&p->lexer);
-        expect_token(&p->lexer, Token_Identifier);
+        Token id_token = grab_token(p);
+        expect_token(p, Token_Identifier);
         AstSymbolEnum Enum = parse_enum_values(p);
 
         AstExpr *type = parser_malloc(p, sizeof(*type));
@@ -1001,13 +1008,13 @@ parse_symbol(Parser *p)
       }
     case Token_Alias:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
-        Token id_token = grab_token(&p->lexer);
-        expect_token(&p->lexer, Token_Identifier);
-        expect_token(&p->lexer, Token_Equal);
+        Token id_token = grab_token(p);
+        expect_token(p, Token_Identifier);
+        expect_token(p, Token_Equal);
         AstExpr *type = parse_type(p);
-        expect_token(&p->lexer, Token_Semicolon);
+        expect_token(p, Token_Semicolon);
 
         AstSymbol *symbol = insert_symbol(p, &id_token);
         *symbol = (AstSymbol){
@@ -1020,18 +1027,18 @@ parse_symbol(Parser *p)
         return symbol;
       }
     case Token_Identifier:
-      switch (peek_ahead_token(&p->lexer, 1))
+      switch (peek_ahead_token(p, 1))
         {
         case Token_Double_Colon:
           {
-            Token id_token = grab_token(&p->lexer);
-            advance_many_tokens(&p->lexer, 2);
+            Token id_token = grab_token(p);
+            advance_many_tokens(p, 2);
 
             AstExpr *type = parse_type(p);
             AstExpr *expr = NULL;
-            if (peek_token(&p->lexer) == Token_Equal)
+            if (peek_token(p) == Token_Equal)
               {
-                advance_token(&p->lexer);
+                advance_token(p);
                 expr = parse_expr(p);
               }
             AstSymbol *symbol = insert_symbol(p, &id_token);
@@ -1045,14 +1052,14 @@ parse_symbol(Parser *p)
               .line_info = id_token.line_info,
             };
 
-            expect_token(&p->lexer, Token_Semicolon);
+            expect_token(p, Token_Semicolon);
 
             return symbol;
           }
         case Token_Double_Colon_Equal:
           {
-            Token id_token = grab_token(&p->lexer);
-            advance_many_tokens(&p->lexer, 2);
+            Token id_token = grab_token(p);
+            advance_many_tokens(p, 2);
 
             AstExpr *expr = parse_expr(p);
             AstSymbol *symbol = insert_symbol(p, &id_token);
@@ -1066,7 +1073,7 @@ parse_symbol(Parser *p)
               .line_info = id_token.line_info,
             };
 
-            expect_token(&p->lexer, Token_Semicolon);
+            expect_token(p, Token_Semicolon);
 
             return symbol;
           }
@@ -1083,9 +1090,9 @@ AstStmt parse_stmt_but_not_symbol(Parser *);
 AstStmt
 parse_stmt(Parser *p)
 {
-  LineInfo line_info = grab_token(&p->lexer).line_info;
+  LineInfo line_info = grab_token(p).line_info;
 
-  switch (peek_token(&p->lexer))
+  switch (peek_token(p))
     {
     case Token_Open_Curly:
       {
@@ -1104,20 +1111,20 @@ parse_stmt(Parser *p)
       }
     case Token_If:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
         AstExpr *expr = parse_expr(p);
 
-        if (peek_token(&p->lexer) == Token_Then)
-          advance_token(&p->lexer);
+        if (peek_token(p) == Token_Then)
+          advance_token(p);
 
         AstStmt *if_true = parser_malloc(p, sizeof(*if_true));
         AstStmt *if_false = NULL;
 
         *if_true = parse_stmt_but_not_symbol(p);
-        if (peek_token(&p->lexer) == Token_Else)
+        if (peek_token(p) == Token_Else)
           {
-            advance_token(&p->lexer);
+            advance_token(p);
             if_false = parser_malloc(p, sizeof(*if_false));
             *if_false = parse_stmt_but_not_symbol(p);
           }
@@ -1136,11 +1143,11 @@ parse_stmt(Parser *p)
       }
     case Token_While:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
         AstExpr *expr = parse_expr(p);
-        if (peek_token(&p->lexer) == Token_Do)
-          advance_token(&p->lexer);
+        if (peek_token(p) == Token_Do)
+          advance_token(p);
 
         AstStmt *block = parser_malloc(p, sizeof(*block));
         *block = parse_stmt_but_not_symbol(p);
@@ -1159,14 +1166,14 @@ parse_stmt(Parser *p)
       }
     case Token_Do:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
         AstStmt *block = parser_malloc(p, sizeof(*block));
         *block = parse_stmt_but_not_symbol(p);
 
-        expect_token(&p->lexer, Token_While);
+        expect_token(p, Token_While);
         AstExpr *expr = parse_expr(p);
-        expect_token(&p->lexer, Token_Semicolon);
+        expect_token(p, Token_Semicolon);
 
         AstStmt stmt = {
           .tag = Ast_Stmt_While,
@@ -1182,8 +1189,8 @@ parse_stmt(Parser *p)
       }
     case Token_Break:
       {
-        advance_token(&p->lexer);
-        expect_token(&p->lexer, Token_Semicolon);
+        advance_token(p);
+        expect_token(p, Token_Semicolon);
 
         AstStmt stmt = {
           .tag = Ast_Stmt_Break,
@@ -1194,8 +1201,8 @@ parse_stmt(Parser *p)
       }
     case Token_Continue:
       {
-        advance_token(&p->lexer);
-        expect_token(&p->lexer, Token_Semicolon);
+        advance_token(p);
+        expect_token(p, Token_Semicolon);
 
         AstStmt stmt = {
           .tag = Ast_Stmt_Continue,
@@ -1206,11 +1213,11 @@ parse_stmt(Parser *p)
       }
     case Token_Return:
       {
-        advance_token(&p->lexer);
-        if (peek_token(&p->lexer) != Token_Semicolon)
+        advance_token(p);
+        if (peek_token(p) != Token_Semicolon)
           {
             AstExpr *expr = parse_expr(p);
-            expect_token(&p->lexer, Token_Semicolon);
+            expect_token(p, Token_Semicolon);
 
             AstStmt stmt = {
               .tag = Ast_Stmt_Return_Expr,
@@ -1221,7 +1228,7 @@ parse_stmt(Parser *p)
             return stmt;
           }
 
-        expect_token(&p->lexer, Token_Semicolon);
+        expect_token(p, Token_Semicolon);
 
         AstStmt stmt = {
           .tag = Ast_Stmt_Return_Nothing,
@@ -1232,7 +1239,7 @@ parse_stmt(Parser *p)
       }
     case Token_Switch:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
 
         AstExpr *cond = parse_expr(p);
 
@@ -1253,10 +1260,10 @@ parse_stmt(Parser *p)
       }
     case Token_Case:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
         AstExpr *expr = parse_expr(p);
-        if (peek_token(&p->lexer) == Token_Then)
-          advance_token(&p->lexer);
+        if (peek_token(p) == Token_Then)
+          advance_token(p);
 
         AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
         *substmt = parse_stmt_but_not_symbol(p);
@@ -1274,7 +1281,7 @@ parse_stmt(Parser *p)
       }
     case Token_Default:
       {
-        advance_token(&p->lexer);
+        advance_token(p);
         AstStmt *substmt = parser_malloc(p, sizeof(*substmt));
         *substmt = parse_stmt_but_not_symbol(p);
 
@@ -1304,11 +1311,11 @@ parse_stmt(Parser *p)
           {
             AstExpr *lhs = parse_expr(p);
 
-            if (peek_token(&p->lexer) == Token_Equal)
+            if (peek_token(p) == Token_Equal)
               {
-                advance_token(&p->lexer);
+                advance_token(p);
                 AstExpr *rhs = parse_expr(p);
-                expect_token(&p->lexer, Token_Semicolon);
+                expect_token(p, Token_Semicolon);
 
                 AstStmt stmt = {
                   .tag = Ast_Stmt_Assign,
@@ -1322,7 +1329,7 @@ parse_stmt(Parser *p)
                 return stmt;
               }
 
-            expect_token(&p->lexer, Token_Semicolon);
+            expect_token(p, Token_Semicolon);
 
             AstStmt stmt = {
               .tag = Ast_Stmt_Expr,
@@ -1339,11 +1346,11 @@ parse_stmt(Parser *p)
 AstStmtBlock
 parse_stmt_block(Parser *p)
 {
-  expect_token(&p->lexer, Token_Open_Curly);
+  expect_token(p, Token_Open_Curly);
 
   AstStmtBlock block = { 0 };
 
-  TokenTag tt = peek_token(&p->lexer);
+  TokenTag tt = peek_token(p);
   while (tt != Token_End_Of_File && tt != Token_Close_Curly)
     {
       AstStmt stmt = parse_stmt(p);
@@ -1351,10 +1358,10 @@ parse_stmt_block(Parser *p)
       LINKED_LIST_PUT_NODE_DATA(AstStmt, node, stmt);
       linked_list_insert_last(&block, node);
 
-      tt = peek_token(&p->lexer);
+      tt = peek_token(p);
     }
 
-  expect_token(&p->lexer, Token_Close_Curly);
+  expect_token(p, Token_Close_Curly);
 
   return block;
 }
@@ -1365,8 +1372,8 @@ parse_stmt_but_not_symbol(Parser *p)
   AstStmt stmt = parse_stmt(p);
   if (stmt.tag == Ast_Stmt_Symbol)
     {
-      PRINT_ERROR0_LN(p->lexer.filepath, stmt.line_info, "can't define variables here");
-      EXIT_ERROR();
+      print_error_ln(p->lexer.filepath, stmt.line_info, "can't define variables here");
+      exit_error();
     }
   return stmt;
 }
@@ -1403,14 +1410,14 @@ parse(const char *filepath)
   parser.current_scope = global_scope;
   parser.global_scope = global_scope;
 
-  while (peek_token(&parser.lexer) != Token_End_Of_File)
+  while (peek_token(&parser) != Token_End_Of_File)
     {
       AstSymbol *symbol = parse_symbol(&parser);
       if (!symbol)
         {
-          Token token = grab_token(&parser.lexer);
-          PRINT_ERROR0_LN(parser.lexer.filepath, token.line_info, "expected symbol definition");
-          EXIT_ERROR();
+          Token token = grab_token(&parser);
+          print_error_ln(parser.lexer.filepath, token.line_info, "expected symbol definition");
+          exit_error();
         }
       LinkedListNode *node = parser_malloc(&parser, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);

@@ -35,8 +35,8 @@ find_symbol(Ast *ast, StringView name, Scope *scope, LineInfo line_info)
     }
   while (true);
 
-  PRINT_ERROR_LN(ast->filepath, line_info, "symbol '%.*s' is not defined", FORMAT_STRING_VIEW(name));
-  EXIT_ERROR();
+  print_error_many_ln(ast->filepath, line_info, "symbol '%.*s' is not defined", FORMAT_STRING_VIEW(name));
+  exit_error();
 }
 
 void resolve_identifiers_expr(Ast *, AstExpr **);
@@ -314,8 +314,8 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
       symbol->resolving_stage = Ast_Symbol_Flag_Being_Resolved;
       break;
     case Ast_Symbol_Flag_Being_Resolved:
-      PRINT_ERROR0_LN(ast->filepath, symbol->line_info, "detected cyclic reference");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, symbol->line_info, "detected cyclic reference");
+      exit_error();
     case Ast_Symbol_Flag_Is_Resolved:
       return;
     }
@@ -368,8 +368,8 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
 
         if (Alias->tag != Ast_Expr_Type)
           {
-            PRINT_ERROR0_LN(ast->filepath, Alias->line_info, "exepected type, not expression");
-            EXIT_ERROR();
+            print_error_ln(ast->filepath, Alias->line_info, "exepected type, not expression");
+            exit_error();
           }
 
         symbol->tag = Ast_Symbol_Type;

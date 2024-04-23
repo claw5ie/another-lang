@@ -1,24 +1,26 @@
 #ifdef NDEBUG
-#define EXIT_ERROR() exit(EXIT_FAILURE)
+#define exit_error() exit(EXIT_FAILURE)
 #else
-#define EXIT_ERROR() do { assert(false); exit(EXIT_FAILURE); } while (0)
+#define exit_error() do { assert(false); exit(EXIT_FAILURE); } while (0)
 #endif
 
-#define ERROR_HEADER "%s:%zu:%zu: error: "
-#define NOTE_HEADER "%s:%zu:%zu: note: "
+#define LINE_HEADER "%s:%zu:%zu: "
 
-#define PRINT_ERROR0_LN(filepath, line_info, message) fprintf(stderr, ERROR_HEADER message "\n", filepath, (line_info).line, (line_info).column)
-#define PRINT_ERROR_LN(filepath, line_info, message, ...) fprintf(stderr, ERROR_HEADER message "\n", filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
-#define PRINT_NOTE0_LN(filepath, line_info, message) fprintf(stderr, NOTE_HEADER message "\n", filepath, (line_info).line, (line_info).column)
-#define PRINT_NOTE_LN(filepath, line_info, message, ...) fprintf(stderr, NOTE_HEADER message "\n", filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
+#define eprint(message) fprintf(stderr, message)
+#define eprint_many(message, ...) fprintf(stderr, message, __VA_ARGS__)
 
-#define PRINT_ERROR0(filepath, line_info, message) fprintf(stderr, ERROR_HEADER message, filepath, (line_info).line, (line_info).column)
-#define PRINT_ERROR(filepath, line_info, message, ...) fprintf(stderr, ERROR_HEADER message, filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
-#define PRINT_NOTE0(filepath, line_info, message) fprintf(stderr, NOTE_HEADER message, filepath, (line_info).line, (line_info).column)
-#define PRINT_NOTE(filepath, line_info, message, ...) fprintf(stderr, NOTE_HEADER message, filepath, (line_info).line, (line_info).column,  __VA_ARGS__)
+#define print_message(filepath, line_info, message) eprint_many(LINE_HEADER message, filepath, (line_info).line, (line_info).column)
+#define print_message_many(filepath, line_info, message, ...) eprint_many(LINE_HEADER message, filepath, (line_info).line, (line_info).column, __VA_ARGS__)
 
-#define EPRINT0(message) fprintf(stderr, message)
-#define EPRINT(message, ...) fprintf(stderr, message, __VA_ARGS__)
+#define print_error(filepath, line_info, message) print_message(filepath, line_info, "error: " message)
+#define print_error_many(filepath, line_info, message, ...) print_message_many(filepath, line_info, "error: " message, __VA_ARGS__)
+#define print_error_ln(filepath, line_info, message) print_message(filepath, line_info, "error: " message "\n")
+#define print_error_many_ln(filepath, line_info, message, ...) print_message_many(filepath, line_info, "error: " message "\n", __VA_ARGS__)
+
+#define print_note(filepath, line_info, message) print_message(filepath, line_info, "note: " message)
+#define print_note_many(filepath, line_info, message, ...) print_message_many(filepath, line_info, "note: " message, __VA_ARGS__)
+#define print_note_ln(filepath, line_info, message) print_message(filepath, line_info, "note: " message "\n")
+#define print_note_many_ln(filepath, line_info, message, ...) print_message_many(filepath, line_info, "note: " message "\n", __VA_ARGS__)
 
 typedef struct LineInfo LineInfo;
 struct LineInfo
@@ -115,6 +117,70 @@ struct Lexer
   const char *filepath;
 };
 
+const char *
+token_tag_to_string(TokenTag tag)
+{
+  switch (tag)
+    {
+    case Token_Open_Paren:    return "'('";
+    case Token_Close_Paren:   return "')'";
+    case Token_Open_Curly:    return "'{'";
+    case Token_Close_Curly:   return "'}'";
+    case Token_Open_Bracket:  return "'['";
+    case Token_Close_Bracket: return "']'";
+    case Token_Semicolon:     return "';'";
+    case Token_Comma:         return "','";
+    case Token_Double_Colon:  return "'::'";
+    case Token_While:         return "'while'";
+    case Token_Identifier:    return "identifier";
+    case Token_Or:
+    case Token_And:
+    case Token_Eq:
+    case Token_Neq:
+    case Token_Leq:
+    case Token_Geq:
+    case Token_Lt:
+    case Token_Gt:
+    case Token_Add:
+    case Token_Sub:
+    case Token_Mul:
+    case Token_Div:
+    case Token_Mod:
+    case Token_Not:
+    case Token_Ref:
+    case Token_Dot:
+    case Token_Equal:
+    case Token_Double_Colon_Equal:
+    case Token_Arrow:
+    case Token_If:
+    case Token_Then:
+    case Token_Else:
+    case Token_Do:
+    case Token_Break:
+    case Token_Continue:
+    case Token_Return:
+    case Token_Switch:
+    case Token_Case:
+    case Token_Default:
+    case Token_Proc:
+    case Token_Struct:
+    case Token_Union:
+    case Token_Enum:
+    case Token_Alias:
+    case Token_Cast:
+    case Token_Void_Type:
+    case Token_Bool_Type:
+    case Token_Int_Type:
+    case Token_False:
+    case Token_True:
+    case Token_Null:
+    case Token_Integer:
+    case Token_End_Of_File: UNREACHABLE();
+    }
+
+  UNREACHABLE();
+}
+
 bool
 is_int_type(StringView text)
 {
@@ -125,7 +191,7 @@ is_int_type(StringView text)
 }
 
 void
-advance_line_info(Lexer *lexer)
+lexer_advance_line_info(Lexer *lexer)
 {
   ++lexer->line_info.column;
   ++lexer->line_info.offset;
@@ -137,7 +203,7 @@ advance_line_info(Lexer *lexer)
 }
 
 void
-buffer_token(Lexer *lexer)
+lexer_buffer_token(Lexer *lexer)
 {
   size_t at = lexer->line_info.offset;
   const char *text = lexer->source_code;
@@ -145,11 +211,11 @@ buffer_token(Lexer *lexer)
   do
     {
       for (; isspace(text[at]); at++)
-        advance_line_info(lexer);
+        lexer_advance_line_info(lexer);
 
       if (text[at] == '/' && text[at + 1] == '/')
         for (; text[at] != '\0' && text[at] != '\n'; at++)
-          advance_line_info(lexer);
+          lexer_advance_line_info(lexer);
       else
         break;
     }
@@ -167,7 +233,7 @@ buffer_token(Lexer *lexer)
     {
       do
         {
-          advance_line_info(lexer);
+          lexer_advance_line_info(lexer);
           ++at;
         }
       while (isdigit(text[at]));
@@ -179,7 +245,7 @@ buffer_token(Lexer *lexer)
     {
       do
         {
-          advance_line_info(lexer);
+          lexer_advance_line_info(lexer);
           ++at;
         }
       while (isalnum(text[at]) || text[at] == '_');
@@ -295,8 +361,8 @@ buffer_token(Lexer *lexer)
             }
         }
 
-      PRINT_ERROR_LN(lexer->filepath, lexer->line_info, "unrecognized character '%c'", text[at]);
-      EXIT_ERROR();
+      print_error_many_ln(lexer->filepath, lexer->line_info, "unrecognized character '%c'", text[at]);
+      exit_error();
     }
 
  push_token:
@@ -306,81 +372,17 @@ buffer_token(Lexer *lexer)
   ++lexer->token_count;
 }
 
-const char *
-token_tag_to_string(TokenTag tag)
-{
-  switch (tag)
-    {
-    case Token_Open_Paren:    return "'('";
-    case Token_Close_Paren:   return "')'";
-    case Token_Open_Curly:    return "'{'";
-    case Token_Close_Curly:   return "'}'";
-    case Token_Open_Bracket:  return "'['";
-    case Token_Close_Bracket: return "']'";
-    case Token_Semicolon:     return "';'";
-    case Token_Comma:         return "','";
-    case Token_Double_Colon:  return "'::'";
-    case Token_While:         return "'while'";
-    case Token_Identifier:    return "identifier";
-    case Token_Or:
-    case Token_And:
-    case Token_Eq:
-    case Token_Neq:
-    case Token_Leq:
-    case Token_Geq:
-    case Token_Lt:
-    case Token_Gt:
-    case Token_Add:
-    case Token_Sub:
-    case Token_Mul:
-    case Token_Div:
-    case Token_Mod:
-    case Token_Not:
-    case Token_Ref:
-    case Token_Dot:
-    case Token_Equal:
-    case Token_Double_Colon_Equal:
-    case Token_Arrow:
-    case Token_If:
-    case Token_Then:
-    case Token_Else:
-    case Token_Do:
-    case Token_Break:
-    case Token_Continue:
-    case Token_Return:
-    case Token_Switch:
-    case Token_Case:
-    case Token_Default:
-    case Token_Proc:
-    case Token_Struct:
-    case Token_Union:
-    case Token_Enum:
-    case Token_Alias:
-    case Token_Cast:
-    case Token_Void_Type:
-    case Token_Bool_Type:
-    case Token_Int_Type:
-    case Token_False:
-    case Token_True:
-    case Token_Null:
-    case Token_Integer:
-    case Token_End_Of_File: UNREACHABLE();
-    }
-
-  UNREACHABLE();
-}
-
 Token
-grab_token(Lexer *lexer)
+lexer_grab_token(Lexer *lexer)
 {
   if (lexer->token_count == 0)
-    buffer_token(lexer);
+    lexer_buffer_token(lexer);
 
   return lexer->tokens[lexer->token_start];
 }
 
 void
-putback_token(Lexer *lexer, Token *token)
+lexer_putback_token(Lexer *lexer, Token *token)
 {
   assert(lexer->token_count < LOOKAHEAD);
   --lexer->token_start;
@@ -390,27 +392,27 @@ putback_token(Lexer *lexer, Token *token)
 }
 
 TokenTag
-peek_ahead_token(Lexer *lexer, u8 index)
+lexer_peek_ahead_token(Lexer *lexer, u8 index)
 {
   assert(index < LOOKAHEAD);
 
   while (lexer->token_count <= index)
-    buffer_token(lexer);
+    lexer_buffer_token(lexer);
 
   return lexer->tokens[(lexer->token_start + index) % LOOKAHEAD].tag;
 }
 
 TokenTag
-peek_token(Lexer *lexer)
+lexer_peek_token(Lexer *lexer)
 {
   if (lexer->token_count == 0)
-    buffer_token(lexer);
+    lexer_buffer_token(lexer);
 
   return lexer->tokens[lexer->token_start].tag;
 }
 
 void
-advance_many_tokens(Lexer *lexer, u8 count)
+lexer_advance_many_tokens(Lexer *lexer, u8 count)
 {
   assert(lexer->token_count >= count);
 
@@ -420,20 +422,20 @@ advance_many_tokens(Lexer *lexer, u8 count)
 }
 
 void
-advance_token(Lexer *lexer)
+lexer_advance_token(Lexer *lexer)
 {
-  advance_many_tokens(lexer, 1);
+  lexer_advance_many_tokens(lexer, 1);
 }
 
 void
-expect_token(Lexer *lexer, TokenTag expected)
+lexer_expect_token(Lexer *lexer, TokenTag expected)
 {
-  if (peek_token(lexer) != expected)
+  if (lexer_peek_token(lexer) != expected)
     {
-      Token token = grab_token(lexer);
-      PRINT_ERROR_LN(lexer->filepath, token.line_info, "expected %s, but got '%.*s'", token_tag_to_string(expected), FORMAT_STRING_VIEW(token.text));
-      EXIT_ERROR();
+      Token token = lexer_grab_token(lexer);
+      print_error_many_ln(lexer->filepath, token.line_info, "expected %s, but got '%.*s'", token_tag_to_string(expected), FORMAT_STRING_VIEW(token.text));
+      exit_error();
     }
 
-  advance_token(lexer);
+  lexer_advance_token(lexer);
 }

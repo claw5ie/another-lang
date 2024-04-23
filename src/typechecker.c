@@ -650,8 +650,8 @@ typecheck_type(Ast *ast, AstExpr *expr)
   // Would be nice to remove this? (like move to the 'resolve identifier' stage)
   if (expr->tag != Ast_Expr_Type)
     {
-      PRINT_ERROR0_LN(ast->filepath, expr->line_info, "expected type, not expression");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, expr->line_info, "expected type, not expression");
+      exit_error();
     }
 
   switch (expr->typechecking_stage)
@@ -663,8 +663,8 @@ typecheck_type(Ast *ast, AstExpr *expr)
       if (ast->flags & AST_FLAG_SKIP_CYCLE)
         return;
 
-      PRINT_ERROR0_LN(ast->filepath, expr->line_info, "detected cyclic reference");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, expr->line_info, "detected cyclic reference");
+      exit_error();
     case Ast_Stage_Is_Typechecked:
       return;
     }
@@ -677,8 +677,8 @@ typecheck_type(Ast *ast, AstExpr *expr)
     case Ast_Expr_Type_Void:
       if (ast->flags & AST_FLAG_REJECT_VOID_TYPE)
         {
-          PRINT_ERROR0_LN(ast->filepath, expr->line_info, "unexpected 'void'");
-          EXIT_ERROR();
+          print_error_ln(ast->filepath, expr->line_info, "unexpected 'void'");
+          exit_error();
         }
 
       break;
@@ -714,10 +714,10 @@ typecheck_type(Ast *ast, AstExpr *expr)
 
         if (!(index_flags & TYPE_IS_INTEGER))
           {
-            PRINT_ERROR0(ast->filepath, expr->line_info, "expected integer, but got '");
+            print_error(ast->filepath, expr->line_info, "expected integer, but got '");
             eprint_type(index_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
       }
 
@@ -770,8 +770,8 @@ typecheck_struct(Ast *ast, AstSymbolStruct *Struct, LinkedList *args, LineInfo l
 
       if (arg_expr->tag != Ast_Expr_Designator)
         {
-          PRINT_ERROR0_LN(ast->filepath, line_info, "expected designator to construct a type");
-          EXIT_ERROR();
+          print_error_ln(ast->filepath, line_info, "expected designator to construct a type");
+          exit_error();
         }
 
       AstExprDesignator *Designator = &arg_expr->as.Designator;
@@ -782,12 +782,12 @@ typecheck_struct(Ast *ast, AstSymbolStruct *Struct, LinkedList *args, LineInfo l
 
       if (!are_types_equal(field_type, arg_type))
         {
-          PRINT_ERROR0(ast->filepath, line_info, "expected '");
+          print_error(ast->filepath, line_info, "expected '");
           eprint_type(field_type);
-          EPRINT0("', but got '");
+          eprint("', but got '");
           eprint_type(arg_type);
-          EPRINT0("'\n");
-          EXIT_ERROR();
+          eprint("'\n");
+          exit_error();
         }
 
       arg_node = arg_node->next;
@@ -815,12 +815,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               if (!are_types_equal(lhs_type, &g_bool_type) || !are_types_equal(rhs_type, &g_bool_type))
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "expected 'bool'/'bool', but got '");
+                  print_error(ast->filepath, expr->line_info, "expected 'bool'/'bool', but got '");
                   eprint_type(lhs_type);
-                  EPRINT0("'/'");
+                  eprint("'/'");
                   eprint_type(rhs_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               return &g_bool_type;
@@ -830,12 +830,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               if (!(lhs_flags & TYPE_IS_COMPARABLE) || !are_types_equal(lhs_type, rhs_type))
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "can't compare '");
+                  print_error(ast->filepath, expr->line_info, "can't compare '");
                   eprint_type(lhs_type);
-                  EPRINT0("'/'");
+                  eprint("'/'");
                   eprint_type(rhs_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               return &g_bool_type;
@@ -847,12 +847,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               if (!(lhs_flags & TYPE_HAS_ORDER) || !are_types_equal(lhs_type, rhs_type))
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "can't compare '");
+                  print_error(ast->filepath, expr->line_info, "can't compare '");
                   eprint_type(lhs_type);
-                  EPRINT0("'/'");
+                  eprint("'/'");
                   eprint_type(rhs_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               return &g_bool_type;
@@ -869,12 +869,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
                   if (!are_int_types_compatible(&Type, lhs_type, rhs_type))
                     {
-                      PRINT_ERROR0(ast->filepath, expr->line_info, "can't add '");
+                      print_error(ast->filepath, expr->line_info, "can't add '");
                       eprint_type(lhs_type);
-                      EPRINT0("'/'");
+                      eprint("'/'");
                       eprint_type(rhs_type);
-                      EPRINT0("'\n");
-                      EXIT_ERROR();
+                      eprint("'\n");
+                      exit_error();
                     }
 
                   AstExpr *result = ast_malloc(ast, sizeof(*result));
@@ -899,12 +899,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
                   if (!are_int_types_compatible(&Type, lhs_type, rhs_type))
                     {
-                      PRINT_ERROR0(ast->filepath, expr->line_info, "can't subtract '");
+                      print_error(ast->filepath, expr->line_info, "can't subtract '");
                       eprint_type(lhs_type);
-                      EPRINT0("'/'");
+                      eprint("'/'");
                       eprint_type(rhs_type);
-                      EPRINT0("'\n");
-                      EXIT_ERROR();
+                      eprint("'\n");
+                      exit_error();
                     }
 
                   AstExpr *result = ast_malloc(ast, sizeof(*result));
@@ -927,12 +927,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
               if (!are_int_types_compatible(&Type, lhs_type, rhs_type))
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "expected integer/intger, but got '");
+                  print_error(ast->filepath, expr->line_info, "expected integer/intger, but got '");
                   eprint_type(lhs_type);
-                  EPRINT0("'/'");
+                  eprint("'/'");
                   eprint_type(rhs_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               AstExpr *result = ast_malloc(ast, sizeof(*result));
@@ -964,10 +964,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
               if (!can_negate_int_type(&Int, subexpr_type))
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "can't negate '");
+                  print_error(ast->filepath, expr->line_info, "can't negate '");
                   eprint_type(subexpr_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               AstExpr *result = ast_malloc(ast, sizeof(*result));
@@ -989,10 +989,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               if (subexpr_type->as.Type.tag != Ast_Expr_Type_Bool)
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "expected 'bool', but got '");
+                  print_error(ast->filepath, expr->line_info, "expected 'bool', but got '");
                   eprint_type(subexpr_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               return &g_bool_type;
@@ -1001,8 +1001,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               if (!(Unary_Op->subexpr->flags & AST_EXPR_FLAG_IS_LVALUE))
                 {
-                  PRINT_ERROR0_LN(ast->filepath, Unary_Op->subexpr->line_info, "expression is not lvalue");
-                  EXIT_ERROR();
+                  print_error_ln(ast->filepath, Unary_Op->subexpr->line_info, "expression is not lvalue");
+                  exit_error();
                 }
 
               AstExpr *result = ast_malloc(ast, sizeof(*result));
@@ -1026,10 +1026,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
               if (!(subexpr_flags & TYPE_CAN_DEREFERENCE))
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "can't dereference '");
+                  print_error(ast->filepath, expr->line_info, "can't dereference '");
                   eprint_type(subexpr_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               expr->flags |= AST_EXPR_FLAG_IS_LVALUE;
@@ -1058,8 +1058,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
             if (result->as.Type.tag == Ast_Expr_Type_Void)
               {
-                PRINT_ERROR0_LN(ast->filepath, expr->line_info, "can't dereference pointer to 'void'");
-                EXIT_ERROR();
+                print_error_ln(ast->filepath, expr->line_info, "can't dereference pointer to 'void'");
+                exit_error();
               }
 
             break;
@@ -1068,19 +1068,19 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             break;
           default:
             {
-              PRINT_ERROR0(ast->filepath, expr->line_info, "'");
+              print_error(ast->filepath, expr->line_info, "'");
               eprint_type(lhs_type);
-              EPRINT0("' is not indexable\n");
-              EXIT_ERROR();
+              eprint("' is not indexable\n");
+              exit_error();
             }
           }
 
         if (!(index_flags & TYPE_IS_INTEGER))
           {
-            PRINT_ERROR0(ast->filepath, expr->line_info, "expected integer, but got '");
+            print_error(ast->filepath, expr->line_info, "expected integer, but got '");
             eprint_type(index_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
 
         if (Array_Access->lhs->flags & AST_EXPR_FLAG_IS_LVALUE)
@@ -1096,18 +1096,18 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
         if (lhs_type->as.Type.tag != Ast_Expr_Type_Proc)
           {
-            PRINT_ERROR0(ast->filepath, expr->line_info, "'");
+            print_error(ast->filepath, expr->line_info, "'");
             eprint_type(lhs_type);
-            EPRINT0("' is not callable\n");
-            EXIT_ERROR();
+            eprint("' is not callable\n");
+            exit_error();
           }
 
         AstExprTypeProc *Proc = &lhs_type->as.Type.as.Proc;
 
         if (Proc->params.count != Call->args.count)
           {
-            PRINT_ERROR_LN(ast->filepath, expr->line_info, "expected %zu arguments, but got %zu", Proc->params.count, Call->args.count);
-            EXIT_ERROR();
+            print_error_many_ln(ast->filepath, expr->line_info, "expected %zu arguments, but got %zu", Proc->params.count, Call->args.count);
+            exit_error();
           }
 
         LinkedListNode *param_node = Proc->params.first;
@@ -1120,12 +1120,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
             if (!are_types_equal(Parameter->type, arg_type))
               {
-                PRINT_ERROR0(ast->filepath, expr->line_info, "expected '");
+                print_error(ast->filepath, expr->line_info, "expected '");
                 eprint_type(Parameter->type);
-                EPRINT0("', but got '");
+                eprint("', but got '");
                 eprint_type(arg_type);
-                EPRINT0("'\n");
-                EXIT_ERROR();
+                eprint("'\n");
+                exit_error();
               }
 
             param_node = param_node->next;
@@ -1144,8 +1144,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
               Type_Cons->lhs = type_hint; // The line info is (probably) not set properly.
             else
               {
-                PRINT_ERROR0_LN(ast->filepath, expr->line_info, "can't infere the type of type constructor");
-                EXIT_ERROR();
+                print_error_ln(ast->filepath, expr->line_info, "can't infere the type of type constructor");
+                exit_error();
               }
           }
 
@@ -1156,8 +1156,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
         switch (Lhs_Type->as.Type.tag)
           {
           case Ast_Expr_Type_Void:
-            PRINT_ERROR0_LN(ast->filepath, expr->line_info, "can't construct value of type 'void'");
-            EXIT_ERROR();
+            print_error_ln(ast->filepath, expr->line_info, "can't construct value of type 'void'");
+            exit_error();
           case Ast_Expr_Type_Bool:
           case Ast_Expr_Type_Int:
           case Ast_Expr_Type_Pointer:
@@ -1166,8 +1166,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               if (Type_Cons->args.count != 1)
                 {
-                  PRINT_ERROR_LN(ast->filepath, expr->line_info, "expected 1 argument, but got %zu", Type_Cons->args.count);
-                  EXIT_ERROR();
+                  print_error_many_ln(ast->filepath, expr->line_info, "expected 1 argument, but got %zu", Type_Cons->args.count);
+                  exit_error();
                 }
 
               AstExpr *expr = LINKED_LIST_GET_NODE_DATA(AstExpr *, Type_Cons->args.first);
@@ -1175,12 +1175,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
               if (!are_types_equal(Lhs_Type, expr_type))
                 {
-                  PRINT_ERROR0(ast->filepath, expr->line_info, "expected '");
+                  print_error(ast->filepath, expr->line_info, "expected '");
                   eprint_type(Lhs_Type);
-                  EPRINT0("', but got '");
+                  eprint("', but got '");
                   eprint_type(expr_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
 
               return Lhs_Type;
@@ -1197,12 +1197,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
                   if (!are_types_equal(subexpr_type, arg_type))
                     {
-                      PRINT_ERROR0(ast->filepath, arg_expr->line_info, "expected '");
+                      print_error(ast->filepath, arg_expr->line_info, "expected '");
                       eprint_type(subexpr_type);
-                      EPRINT0("', but got '");
+                      eprint("', but got '");
                       eprint_type(arg_type);
-                      EPRINT0("'\n");
-                      EXIT_ERROR();
+                      eprint("'\n");
+                      exit_error();
                     }
 
                   arg_node = arg_node->next;
@@ -1238,10 +1238,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
                 scope = lhs_type->as.Type.as.Enum.scope;
                 break;
               default:
-                PRINT_ERROR0(ast->filepath, expr->line_info, "expected 'enum', but got '");
+                print_error(ast->filepath, expr->line_info, "expected 'enum', but got '");
                 eprint_type(lhs_type);
-                EPRINT0("'\n");
-                EXIT_ERROR();
+                eprint("'\n");
+                exit_error();
               }
 
             AstSymbol *symbol = find_symbol(ast, Field_Access->name, scope, expr->line_info);
@@ -1277,10 +1277,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
                       scope = subtype->as.Type.as.Union.scope;
                       break;
                     default:
-                      PRINT_ERROR0(ast->filepath, expr->line_info, "expected pointer to 'struct'/'union', but got '");
+                      print_error(ast->filepath, expr->line_info, "expected pointer to 'struct'/'union', but got '");
                       eprint_type(lhs_type);
-                      EPRINT0("'\n");
-                      EXIT_ERROR();
+                      eprint("'\n");
+                      exit_error();
                     }
                 }
 
@@ -1292,10 +1292,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
                 scope = lhs_type->as.Type.as.Union.scope;
                 break;
               default:
-                PRINT_ERROR0(ast->filepath, expr->line_info, "expected 'struct'/'union' or pointer to 'struct'/'union', but got '");
+                print_error(ast->filepath, expr->line_info, "expected 'struct'/'union' or pointer to 'struct'/'union', but got '");
                 eprint_type(lhs_type);
-                EPRINT0("'\n");
-                EXIT_ERROR();
+                eprint("'\n");
+                exit_error();
               }
 
             AstSymbol *symbol = find_symbol(ast, Field_Access->name, scope, expr->line_info);
@@ -1311,8 +1311,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
       {
         if (!type_hint)
           {
-            PRINT_ERROR0_LN(ast->filepath, expr->line_info, "can't deduce the type of expression");
-            EXIT_ERROR();
+            print_error_ln(ast->filepath, expr->line_info, "can't deduce the type of expression");
+            exit_error();
           }
 
         AstExpr *expr_type = typecheck_expr(ast, NULL, expr->as.Cast1);
@@ -1320,12 +1320,12 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
         // Need to add a new node to reflect the conversion being made.
         if (!can_cast_to_type(type_hint, expr_type))
           {
-            PRINT_ERROR0(ast->filepath, expr->line_info, "can't cast '");
+            print_error(ast->filepath, expr->line_info, "can't cast '");
             eprint_type(type_hint);
-            EPRINT0("' to '");
+            eprint("' to '");
             eprint_type(expr_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
 
         AstExpr *tmp = expr->as.Cast1;
@@ -1347,19 +1347,19 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
         // Add new node here as well (just like for 'Cast1').
         if (!can_cast_to_type(Cast2->type, expr_type))
           {
-            PRINT_ERROR0(ast->filepath, expr->line_info, "can't cast '");
+            print_error(ast->filepath, expr->line_info, "can't cast '");
             eprint_type(type_hint);
-            EPRINT0("' to '");
+            eprint("' to '");
             eprint_type(expr_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
 
         return Cast2->type;
       }
     case Ast_Expr_Type:
-      PRINT_ERROR0_LN(ast->filepath, expr->line_info, "unexpected type here");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, expr->line_info, "unexpected type here");
+      exit_error();
     case Ast_Expr_Int64:
       return &g_generic_int_type;
     case Ast_Expr_Bool:
@@ -1367,8 +1367,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
     case Ast_Expr_Null:
       return &g_null_type;
     case Ast_Expr_Designator:
-      PRINT_ERROR0_LN(ast->filepath, expr->line_info, "unexpected designator");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, expr->line_info, "unexpected designator");
+      exit_error();
     case Ast_Expr_Symbol:
       {
         AstSymbol *symbol = expr->as.Symbol;
@@ -1379,8 +1379,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               if (!(symbol->flags & AST_SYMBOL_FLAG_VARIABLE_IS_TYPECHECKED))
                 {
-                  PRINT_ERROR0_LN(ast->filepath, expr->line_info, "variable is used in its own definition");
-                  EXIT_ERROR();
+                  print_error_ln(ast->filepath, expr->line_info, "variable is used in its own definition");
+                  exit_error();
                 }
 
               AstExpr *type = symbol->as.Variable.type;
@@ -1417,8 +1417,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
       {
         if (!type_hint)
           {
-            PRINT_ERROR0_LN(ast->filepath, expr->line_info, "can't infere the type of enum identifier");
-            EXIT_ERROR();
+            print_error_ln(ast->filepath, expr->line_info, "can't infere the type of enum identifier");
+            exit_error();
           }
 
         AstExprIdentifier *Enum_Identifier = &expr->as.Enum_Identifier;
@@ -1441,10 +1441,10 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
               return type_hint;
             }
           default:
-            PRINT_ERROR0(ast->filepath, expr->line_info, "expected 'enum' type, but got '");
+            print_error(ast->filepath, expr->line_info, "expected 'enum' type, but got '");
             eprint_type(type_hint);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
       }
     case Ast_Expr_Identifier:
@@ -1466,8 +1466,8 @@ typecheck_symbol(Ast *ast, AstSymbol *symbol)
       if (symbol->tag == Ast_Symbol_Procedure)
         return;
 
-      PRINT_ERROR0_LN(ast->filepath, symbol->line_info, "detected cyclic reference");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, symbol->line_info, "detected cyclic reference");
+      exit_error();
     case Ast_Stage_Is_Typechecked:
       return;
     }
@@ -1497,12 +1497,12 @@ typecheck_symbol(Ast *ast, AstSymbol *symbol)
 
               if (!are_types_equal(Variable->type, expr_type))
                 {
-                  PRINT_ERROR0(ast->filepath, Variable->expr->line_info, "expected '");
+                  print_error(ast->filepath, Variable->expr->line_info, "expected '");
                   eprint_type(Variable->type);
-                  EPRINT0("', but got '");
+                  eprint("', but got '");
                   eprint_type(expr_type);
-                  EPRINT0("'\n");
-                  EXIT_ERROR();
+                  eprint("'\n");
+                  exit_error();
                 }
             }
 
@@ -1547,8 +1547,8 @@ typecheck_symbol(Ast *ast, AstSymbol *symbol)
 
         if (Enum_Value->depends_on && Enum_Value->depends_on->typechecking_stage == Ast_Stage_Being_Typechecked)
           {
-            PRINT_ERROR0_LN(ast->filepath, symbol->line_info, "detected cyclic reference");
-            EXIT_ERROR();
+            print_error_ln(ast->filepath, symbol->line_info, "detected cyclic reference");
+            exit_error();
           }
 
         if (Enum_Value->expr)
@@ -1557,12 +1557,12 @@ typecheck_symbol(Ast *ast, AstSymbol *symbol)
 
             if (!are_types_equal(Enum_Value->type, expr_type))
               {
-                PRINT_ERROR0(ast->filepath, Enum_Value->expr->line_info, "expected '");
+                print_error(ast->filepath, Enum_Value->expr->line_info, "expected '");
                 eprint_type(Enum_Value->type);
-                EPRINT0("', but got '");
+                eprint("', but got '");
                 eprint_type(expr_type);
-                EPRINT0("'\n");
-                EXIT_ERROR();
+                eprint("'\n");
+                exit_error();
               }
           }
       }
@@ -1592,10 +1592,10 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
         if (!are_types_equal(cond_type, &g_bool_type))
           {
-            PRINT_ERROR0(ast->filepath, stmt->line_info, "expected 'bool', but got '");
+            print_error(ast->filepath, stmt->line_info, "expected 'bool', but got '");
             eprint_type(cond_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
 
         typecheck_stmt(ast, If->if_true);
@@ -1612,10 +1612,10 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
         if (!are_types_equal(cond_type, &g_bool_type))
           {
-            PRINT_ERROR0(ast->filepath, stmt->line_info, "expected 'bool', but got '");
+            print_error(ast->filepath, stmt->line_info, "expected 'bool', but got '");
             eprint_type(cond_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
 
         AstFlagsType old_flags = ast->flags;
@@ -1630,16 +1630,16 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
     case Ast_Stmt_Break:
       if (!(ast->flags & AST_FLAG_IS_IN_LOOP))
         {
-          PRINT_ERROR0_LN(ast->filepath, stmt->line_info, "'break' outside of a loop");
-          EXIT_ERROR();
+          print_error_ln(ast->filepath, stmt->line_info, "'break' outside of a loop");
+          exit_error();
         }
 
       break;
     case Ast_Stmt_Continue:
       if (!(ast->flags & AST_FLAG_IS_IN_LOOP))
         {
-          PRINT_ERROR0_LN(ast->filepath, stmt->line_info, "'continue' outside of a loop");
-          EXIT_ERROR();
+          print_error_ln(ast->filepath, stmt->line_info, "'continue' outside of a loop");
+          exit_error();
         }
 
       break;
@@ -1653,17 +1653,17 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
         if (are_types_equal(ast->return_type, &g_void_type))
           {
-            PRINT_ERROR0_LN(ast->filepath, Expr->line_info, "unexpected expression when function returns 'void'");
-            EXIT_ERROR();
+            print_error_ln(ast->filepath, Expr->line_info, "unexpected expression when function returns 'void'");
+            exit_error();
           }
         else if (!are_types_equal(expr_type, ast->return_type))
           {
-            PRINT_ERROR0(ast->filepath, Expr->line_info, "expected '");
+            print_error(ast->filepath, Expr->line_info, "expected '");
             eprint_type(ast->return_type);
-            EPRINT0("', but got '");
+            eprint("', but got '");
             eprint_type(expr_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
       }
 
@@ -1685,8 +1685,8 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
               case Ast_Stmt_Default:
                 break;
               default:
-                PRINT_ERROR0_LN(ast->filepath, substmt->line_info, "expected 'case' or 'default' statement");
-                EXIT_ERROR();
+                print_error_ln(ast->filepath, substmt->line_info, "expected 'case' or 'default' statement");
+                exit_error();
               }
 
             do
@@ -1701,12 +1701,12 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
                       if (!are_types_equal(cond_type, case_type))
                         {
-                          PRINT_ERROR0(ast->filepath, Case->expr->line_info, "expected '");
+                          print_error(ast->filepath, Case->expr->line_info, "expected '");
                           eprint_type(cond_type);
-                          EPRINT0("', but got '");
+                          eprint("', but got '");
                           eprint_type(case_type);
-                          EPRINT0("'\n");
-                          EXIT_ERROR();
+                          eprint("'\n");
+                          exit_error();
                         }
 
                       substmt = Case->substmt;
@@ -1719,9 +1719,9 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
                       if (default_case)
                         {
-                          PRINT_ERROR0_LN(ast->filepath, substmt->line_info, "default statement was already defined");
-                          PRINT_NOTE0_LN(ast->filepath, default_case->line_info, "first defined here");
-                          EXIT_ERROR();
+                          print_error_ln(ast->filepath, substmt->line_info, "default statement was already defined");
+                          print_note_ln(ast->filepath, default_case->line_info, "first defined here");
+                          exit_error();
                         }
 
                       default_case = Default;
@@ -1749,12 +1749,12 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
       break;
     case Ast_Stmt_Case:
-      PRINT_ERROR0_LN(ast->filepath, stmt->line_info, "'case' statement can't be here");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, stmt->line_info, "'case' statement can't be here");
+      exit_error();
       break;
     case Ast_Stmt_Default:
-      PRINT_ERROR0_LN(ast->filepath, stmt->line_info, "'default' statement can't be here");
-      EXIT_ERROR();
+      print_error_ln(ast->filepath, stmt->line_info, "'default' statement can't be here");
+      exit_error();
       break;
     case Ast_Stmt_Assign:
       {
@@ -1765,12 +1765,12 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
         if (!are_types_equal(lhs_type, rhs_type))
           {
-            PRINT_ERROR0(ast->filepath, Assign->rhs->line_info, "expected '");
+            print_error(ast->filepath, Assign->rhs->line_info, "expected '");
             eprint_type(lhs_type);
-            EPRINT0("', but got '");
+            eprint("', but got '");
             eprint_type(rhs_type);
-            EPRINT0("'\n");
-            EXIT_ERROR();
+            eprint("'\n");
+            exit_error();
           }
       }
 
@@ -1786,8 +1786,8 @@ typecheck_stmt(Ast *ast, AstStmt *stmt)
 
         if (Expr->tag != Ast_Expr_Call)
           {
-            PRINT_ERROR0_LN(ast->filepath, Expr->line_info, "can only call function here");
-            EXIT_ERROR();
+            print_error_ln(ast->filepath, Expr->line_info, "can only call function here");
+            exit_error();
           }
       }
 

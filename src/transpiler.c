@@ -3,22 +3,23 @@
 //       add bit fields.
 //       generate name for unnamed types, 'cause can't assign a structure with unnamed type to a variable with infered type.
 
-#define TAB_SPACE 2
-#define PUTS(string) fputs(string, stdout)
+#define TAB_SIZE 2
+
+#define put_string(string) fputs(string, stdout)
 
 void transpile_to_c_expr(AstExpr *, size_t);
 void transpile_to_c_type(AstExpr *, size_t);
 void transpile_to_c_stmt_block_no_curly(AstStmtBlock *, size_t);
 void transpile_to_c_stmt_block(AstStmtBlock *, size_t);
 
-// TODO: remove this.
+// TODO: remove this global variable.
 int ast_flags = 0;
 
 void
 put_spaces(size_t count)
 {
   while (count-- > 0)
-    PUTS(" ");
+    put_string(" ");
 }
 
 void
@@ -30,14 +31,14 @@ transpile_to_c_expr_list(LinkedList *list, size_t ident)
       transpile_to_c_expr(expr, ident);
 
       if (node->next)
-        PUTS(", ");
+        put_string(", ");
     }
 }
 
 void
 transpile_to_c_type_proc_params(AstExprTypeProc *proc, size_t ident)
 {
-  PUTS("(");
+  put_string("(");
   for (LinkedListNode *node = proc->params.first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
@@ -48,51 +49,51 @@ transpile_to_c_type_proc_params(AstExprTypeProc *proc, size_t ident)
         printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
 
       if (node->next)
-        PUTS(", ");
+        put_string(", ");
     }
-  PUTS(")");
+  put_string(")");
 }
 
 void
 transpile_to_c_struct_fields(LinkedList *fields, size_t ident)
 {
   put_spaces(ident);
-  PUTS("{\n");
+  put_string("{\n");
   for (LinkedListNode *node = fields->first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       AstSymbolStructField *Struct_Field = &symbol->as.Struct_Field;
 
-      put_spaces(ident + TAB_SPACE);
+      put_spaces(ident + TAB_SIZE);
       transpile_to_c_expr(Struct_Field->type, ident);
-      PUTS(" ");
+      put_string(" ");
       printf("%.*s;\n", FORMAT_STRING_VIEW(symbol->name));
     }
   put_spaces(ident);
-  PUTS("}");
+  put_string("}");
 }
 
 void
 transpile_to_c_enum_values(LinkedList *values, size_t ident)
 {
   put_spaces(ident);
-  PUTS("{\n");
+  put_string("{\n");
   for (LinkedListNode *node = values->first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       AstSymbolEnumValue *Enum_Value = &symbol->as.Enum_Value;
 
-      put_spaces(ident + TAB_SPACE);
+      put_spaces(ident + TAB_SIZE);
       printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
       if (Enum_Value->expr)
         {
-          PUTS(" = ");
+          put_string(" = ");
           transpile_to_c_expr(Enum_Value->expr, ident);
         }
-      PUTS(",\n");
+      put_string(",\n");
     }
   put_spaces(ident);
-  PUTS("}");
+  put_string("}");
 }
 
 void
@@ -104,26 +105,26 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       {
         AstExprBinaryOp *Binary_Op = &expr->as.Binary_Op;
 
-        PUTS("(");
+        put_string("(");
         transpile_to_c_expr(Binary_Op->lhs, ident);
         switch (Binary_Op->tag)
           {
-          case Ast_Expr_Binary_Op_Or:  PUTS(" || "); break;
-          case Ast_Expr_Binary_Op_And: PUTS(" && "); break;
-          case Ast_Expr_Binary_Op_Eq:  PUTS(" == "); break;
-          case Ast_Expr_Binary_Op_Neq: PUTS(" != "); break;
-          case Ast_Expr_Binary_Op_Leq: PUTS(" <= "); break;
-          case Ast_Expr_Binary_Op_Geq: PUTS(" >= "); break;
-          case Ast_Expr_Binary_Op_Lt:  PUTS(" < "); break;
-          case Ast_Expr_Binary_Op_Gt:  PUTS(" > "); break;
-          case Ast_Expr_Binary_Op_Add: PUTS(" + "); break;
-          case Ast_Expr_Binary_Op_Sub: PUTS(" - "); break;
-          case Ast_Expr_Binary_Op_Mul: PUTS(" * "); break;
-          case Ast_Expr_Binary_Op_Div: PUTS(" / "); break;
-          case Ast_Expr_Binary_Op_Mod: PUTS(" % "); break;
+          case Ast_Expr_Binary_Op_Or:  put_string(" || "); break;
+          case Ast_Expr_Binary_Op_And: put_string(" && "); break;
+          case Ast_Expr_Binary_Op_Eq:  put_string(" == "); break;
+          case Ast_Expr_Binary_Op_Neq: put_string(" != "); break;
+          case Ast_Expr_Binary_Op_Leq: put_string(" <= "); break;
+          case Ast_Expr_Binary_Op_Geq: put_string(" >= "); break;
+          case Ast_Expr_Binary_Op_Lt:  put_string(" < "); break;
+          case Ast_Expr_Binary_Op_Gt:  put_string(" > "); break;
+          case Ast_Expr_Binary_Op_Add: put_string(" + "); break;
+          case Ast_Expr_Binary_Op_Sub: put_string(" - "); break;
+          case Ast_Expr_Binary_Op_Mul: put_string(" * "); break;
+          case Ast_Expr_Binary_Op_Div: put_string(" / "); break;
+          case Ast_Expr_Binary_Op_Mod: put_string(" % "); break;
           }
         transpile_to_c_expr(Binary_Op->rhs, ident);
-        PUTS(")");
+        put_string(")");
       }
 
       break;
@@ -135,33 +136,33 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
           {
           case Ast_Expr_Unary_Op_Neg:
             {
-              PUTS("-(");
+              put_string("-(");
               transpile_to_c_expr(Unary_Op->subexpr, ident);
-              PUTS(")");
+              put_string(")");
             }
 
             break;
           case Ast_Expr_Unary_Op_Not:
             {
-              PUTS("!(");
+              put_string("!(");
               transpile_to_c_expr(Unary_Op->subexpr, ident);
-              PUTS(")");
+              put_string(")");
             }
 
             break;
           case Ast_Expr_Unary_Op_Ref:
             {
-              PUTS("&(");
+              put_string("&(");
               transpile_to_c_expr(Unary_Op->subexpr, ident);
-              PUTS(")");
+              put_string(")");
             }
 
             break;
           case Ast_Expr_Unary_Op_Deref:
             {
-              PUTS("(");
+              put_string("(");
               transpile_to_c_expr(Unary_Op->subexpr, ident);
-              PUTS(")*");
+              put_string(")*");
             }
 
             break;
@@ -174,9 +175,9 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
         AstExprArrayAccess *Array_Access = &expr->as.Array_Access;
 
         transpile_to_c_expr(Array_Access->lhs, ident);
-        PUTS("[");
+        put_string("[");
         transpile_to_c_expr(Array_Access->index, ident);
-        PUTS("]");
+        put_string("]");
       }
 
       break;
@@ -185,9 +186,9 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
         AstExprCall *Call = &expr->as.Call;
 
         transpile_to_c_expr(Call->lhs, ident);
-        PUTS("(");
+        put_string("(");
         transpile_to_c_expr_list(&Call->args, ident);
-        PUTS(")");
+        put_string(")");
       }
 
       break;
@@ -199,13 +200,13 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
 
         if (!(ast_flags & AST_FLAG_DONT_CAST_EXPR_LIST))
           {
-            PUTS("(");
+            put_string("(");
             transpile_to_c_type(Type_Cons->lhs, ident);
-            PUTS(")");
+            put_string(")");
           }
-        PUTS("{");
+        put_string("{");
         transpile_to_c_expr_list(&Type_Cons->args, ident);
-        PUTS("}");
+        put_string("}");
       }
 
       break;
@@ -214,7 +215,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
         AstExprFieldAccess *Field_Access = &expr->as.Field_Access;
 
         transpile_to_c_expr(Field_Access->lhs, ident);
-        PUTS(".");
+        put_string(".");
         printf("%.*s", FORMAT_STRING_VIEW(Field_Access->name));
       }
 
@@ -223,9 +224,9 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       {
         AstExprCast2 *Cast2 = &expr->as.Cast2;
 
-        PUTS("(");
+        put_string("(");
         transpile_to_c_type(Cast2->type, ident);
-        PUTS(")");
+        put_string(")");
         transpile_to_c_expr(Cast2->expr, ident);
       }
 
@@ -259,7 +260,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
 
       break;
     case Ast_Expr_Null:
-      PUTS("NULL");
+      put_string("NULL");
       break;
     case Ast_Expr_Symbol:
       {
@@ -286,9 +287,9 @@ transpile_to_c_type_array(AstExpr *type, AstSymbol *symbol, size_t ident)
         AstExprArrayAccess *Array = &type->as.Type.as.Array;
 
         transpile_to_c_type_array(Array->lhs, symbol, ident);
-        PUTS("[");
+        put_string("[");
         transpile_to_c_expr(Array->index, ident);
-        PUTS("]");
+        put_string("]");
       }
 
       break;
@@ -309,10 +310,10 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
   switch (Type->tag)
     {
     case Ast_Expr_Type_Void:
-      PUTS("void");
+      put_string("void");
       break;
     case Ast_Expr_Type_Bool:
-      PUTS("bool");
+      put_string("bool");
       break;
     case Ast_Expr_Type_Int:
       {
@@ -323,11 +324,11 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
 
       break;
     case Ast_Expr_Type_Generic_Int:
-      PUTS("i64");
+      put_string("i64");
       break;
     case Ast_Expr_Type_Pointer:
       transpile_to_c_type_with_symbol(Type->as.Pointer, symbol, ident);
-      PUTS("*");
+      put_string("*");
       break;
     case Ast_Expr_Type_Proc:
       {
@@ -336,10 +337,10 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
         should_print_symbol_name = false;
 
         transpile_to_c_type_with_symbol(Proc->return_type, NULL, ident);
-        PUTS(" (*");
+        put_string(" (*");
         if (symbol)
           printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
-        PUTS(")");
+        put_string(")");
         transpile_to_c_type_proc_params(Proc, ident);
       }
 
@@ -380,7 +381,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
           AstSymbolEnum *Enum = &Type->as.Enum;
 
           printf("enum\n");
-          transpile_to_c_enum_values(&Enum->values, ident + TAB_SPACE);
+          transpile_to_c_enum_values(&Enum->values, ident + TAB_SIZE);
         }
 
       break;
@@ -413,10 +414,10 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
         transpile_to_c_type_with_symbol(Variable->type, symbol, ident);
         if (Variable->expr)
           {
-            PUTS(" = ");
+            put_string(" = ");
             transpile_to_c_expr(Variable->expr, ident);
           }
-        PUTS(";");
+        put_string(";");
 
         ast_flags = old_flags;
       }
@@ -440,9 +441,9 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
         transpile_to_c_type(Proc->return_type, ident);
         printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
         transpile_to_c_type_proc_params(Proc, ident);
-        PUTS("\n");
+        put_string("\n");
         transpile_to_c_stmt_block(&Procedure->block, ident);
-        PUTS("\n");
+        put_string("\n");
       }
 
       break;
@@ -464,7 +465,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
 
                   printf("struct %.*s\n", FORMAT_STRING_VIEW(symbol->name));
                   transpile_to_c_struct_fields(&Struct->fields, ident);
-                  PUTS(";\n");
+                  put_string(";\n");
                 }
 
                 break;
@@ -474,7 +475,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
 
                   printf("union %.*s\n", FORMAT_STRING_VIEW(symbol->name));
                   transpile_to_c_struct_fields(&Union->fields, ident);
-                  PUTS(";\n");
+                  put_string(";\n");
                 }
 
                 break;
@@ -483,15 +484,15 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
                   AstSymbolEnum *Enum = &Expr_Type->as.Enum;
 
                   printf("enum %.*s\n", FORMAT_STRING_VIEW(symbol->name));
-                  transpile_to_c_enum_values(&Enum->values, ident + TAB_SPACE);
-                  PUTS(";\n");
+                  transpile_to_c_enum_values(&Enum->values, ident + TAB_SIZE);
+                  put_string(";\n");
                 }
 
                 break;
               default:
-                PUTS("typedef ");
+                put_string("typedef ");
                 transpile_to_c_type_with_symbol(Type, symbol, ident);
-                PUTS(";\n");
+                put_string(";\n");
               }
           }
       }
@@ -517,21 +518,21 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
         AstStmtIf *If = &stmt->as.If;
 
         put_spaces(ident);
-        PUTS("if (");
+        put_string("if (");
         transpile_to_c_expr(If->cond, ident);
-        PUTS(")\n");
-        transpile_to_c_stmt(If->if_true, ident + TAB_SPACE);
-        PUTS("\n");
+        put_string(")\n");
+        transpile_to_c_stmt(If->if_true, ident + TAB_SIZE);
+        put_string("\n");
         put_spaces(ident);
-        PUTS("else\n");
+        put_string("else\n");
         if (If->if_false)
-          transpile_to_c_stmt(If->if_false, ident + TAB_SPACE);
+          transpile_to_c_stmt(If->if_false, ident + TAB_SIZE);
         else
           {
-            put_spaces(ident + TAB_SPACE);
-            PUTS("{ /* empty */ }");
+            put_spaces(ident + TAB_SIZE);
+            put_string("{ /* empty */ }");
           }
-        PUTS("\n");
+        put_string("\n");
       }
 
       break;
@@ -542,68 +543,68 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
         if (While->is_do_while)
           {
             put_spaces(ident);
-            PUTS("do\n");
-            transpile_to_c_stmt(While->block, ident + TAB_SPACE);
-            PUTS("\n");
+            put_string("do\n");
+            transpile_to_c_stmt(While->block, ident + TAB_SIZE);
+            put_string("\n");
             put_spaces(ident);
-            PUTS("while (");
+            put_string("while (");
             transpile_to_c_expr(While->cond, ident);
-            PUTS(");\n");
+            put_string(");\n");
           }
         else
           {
             put_spaces(ident);
-            PUTS("while (");
+            put_string("while (");
             transpile_to_c_expr(While->cond, ident);
-            PUTS(")\n");
-            transpile_to_c_stmt(While->block, ident + TAB_SPACE);
-            PUTS("\n");
+            put_string(")\n");
+            transpile_to_c_stmt(While->block, ident + TAB_SIZE);
+            put_string("\n");
           }
       }
 
       break;
     case Ast_Stmt_Break:
       put_spaces(ident);
-      PUTS("break;");
+      put_string("break;");
       break;
     case Ast_Stmt_Continue:
       put_spaces(ident);
-      PUTS("continue;");
+      put_string("continue;");
       break;
     case Ast_Stmt_Return_Nothing:
       put_spaces(ident);
-      PUTS("return;");
+      put_string("return;");
       break;
     case Ast_Stmt_Return_Expr:
       put_spaces(ident);
-      PUTS("return ");
+      put_string("return ");
       transpile_to_c_expr(stmt->as.Return_Expr, ident);
-      PUTS(";");
+      put_string(";");
       break;
     case Ast_Stmt_Switch:
       {
         AstStmtSwitch *Switch = &stmt->as.Switch;
 
         put_spaces(ident);
-        PUTS("switch (");
+        put_string("switch (");
         transpile_to_c_expr(Switch->cond, ident);
-        PUTS(")\n");
-        ident += TAB_SPACE;
+        put_string(")\n");
+        ident += TAB_SIZE;
         put_spaces(ident);
-        PUTS("{\n");
+        put_string("{\n");
         transpile_to_c_stmt_block_no_curly(&Switch->cases, ident);
         if (Switch->default_case)
           {
             put_spaces(ident);
-            PUTS("default:\n");
-            ident += TAB_SPACE;
+            put_string("default:\n");
+            ident += TAB_SIZE;
             transpile_to_c_stmt(Switch->default_case, ident);
-            ident -= TAB_SPACE;
+            ident -= TAB_SIZE;
           }
-        PUTS("\n");
+        put_string("\n");
         put_spaces(ident);
-        PUTS("}");
-        ident -= TAB_SPACE;
+        put_string("}");
+        ident -= TAB_SIZE;
       }
 
       break;
@@ -611,18 +612,18 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
       {
         AstStmtCase *Case = &stmt->as.Case;
 
-        put_spaces(ident - (ident < TAB_SPACE ? 0 : TAB_SPACE));
-        PUTS("case ");
+        put_spaces(ident - (ident < TAB_SIZE ? 0 : TAB_SIZE));
+        put_string("case ");
         transpile_to_c_expr(Case->expr, ident);
-        PUTS(":\n");
+        put_string(":\n");
         transpile_to_c_stmt(Case->substmt, ident);
       }
 
       break;
     case Ast_Stmt_Default:
       {
-        put_spaces(ident - (ident < TAB_SPACE ? 0 : TAB_SPACE));
-        PUTS("default:\n");
+        put_spaces(ident - (ident < TAB_SIZE ? 0 : TAB_SIZE));
+        put_string("default:\n");
         transpile_to_c_stmt(stmt->as.Default, ident);
       }
 
@@ -633,9 +634,9 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
 
         put_spaces(ident);
         transpile_to_c_expr(Assign->lhs, ident);
-        PUTS(" = ");
+        put_string(" = ");
         transpile_to_c_expr(Assign->rhs, ident);
-        PUTS(";");
+        put_string(";");
       }
 
       break;
@@ -645,7 +646,7 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
     case Ast_Stmt_Expr:
       put_spaces(ident);
       transpile_to_c_expr(stmt->as.Expr, ident);
-      PUTS(";");
+      put_string(";");
       break;
     }
 }
@@ -653,24 +654,24 @@ transpile_to_c_stmt(AstStmt *stmt, size_t ident)
 void
 transpile_to_c_stmt_block_no_curly(AstStmtBlock *block, size_t ident)
 {
-  ident += TAB_SPACE;
+  ident += TAB_SIZE;
   for (LinkedListNode *node = block->first; node; node = node->next)
     {
       AstStmt *stmt = &LINKED_LIST_GET_NODE_DATA(AstStmt, node);
       transpile_to_c_stmt(stmt, ident);
-      PUTS("\n");
+      put_string("\n");
     }
-  ident -= TAB_SPACE;
+  ident -= TAB_SIZE;
 }
 
 void
 transpile_to_c_stmt_block(AstStmtBlock *block, size_t ident)
 {
   put_spaces(ident);
-  PUTS("{\n");
+  put_string("{\n");
   transpile_to_c_stmt_block_no_curly(block, ident);
   put_spaces(ident);
-  PUTS("}");
+  put_string("}");
 }
 
 void
@@ -680,6 +681,6 @@ transpile_to_c(Ast *ast)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       transpile_to_c_symbol(symbol, 0);
-      PUTS("\n");
+      put_string("\n");
     }
 }

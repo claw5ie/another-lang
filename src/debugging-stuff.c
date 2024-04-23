@@ -67,8 +67,8 @@ debug_print_all_tokens(Lexer *lexer)
 {
   do
     {
-      Token token = grab_token(lexer);
-      advance_token(lexer);
+      Token token = lexer_grab_token(lexer);
+      lexer_advance_token(lexer);
 
       printf("Token.%s:\n"
              "    text: '%.*s'\n"
