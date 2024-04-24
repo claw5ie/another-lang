@@ -1,5 +1,8 @@
 // TODO: round int types to closest power of two.
 //       add bit fields.
+//       add strings.
+//       typedef/shuffle recursive types.
+//       forward declare functions.
 
 #define TAB_SIZE 2
 #define SYMBOL_NAME_SPECIFIER "%.*s_0x%x"
