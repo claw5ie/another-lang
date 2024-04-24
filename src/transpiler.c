@@ -1,6 +1,5 @@
 // TODO: round int types to closest power of two.
 //       add bit fields.
-//       don't use find_symbol to search for fields and enums.
 
 #define TAB_SIZE 2
 #define SYMBOL_NAME_SPECIFIER "%.*s_0x%x"

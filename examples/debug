@@ -145,10 +145,13 @@ proc foofaz()
   alias B = C;
   alias A = B;
 
+  y :: i32;
+
   struct Foo
   {
     x :: Foo*,
+    y :: i32,
   }
 
-  a :: Foo;
+  a :: Foo = _(y = 42);
 }

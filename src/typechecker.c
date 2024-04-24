@@ -777,7 +777,7 @@ typecheck_struct_or_union(Ast *ast, AstExprTypeStruct *Struct, LinkedList *args,
         }
 
       AstExprUnresolvedField *Unresolved_Designator = &arg_expr->as.Unresolved_Designator;
-      AstSymbol *symbol = find_symbol(ast, Unresolved_Designator->name, Struct->scope, line_info);
+      AstSymbol *symbol = find_symbol_in_scope(ast, Unresolved_Designator->name, Struct->scope, line_info);
       assert(symbol->tag == Ast_Symbol_Struct_Field || symbol->tag == Ast_Symbol_Union_Field);
       AstExpr *field_type = symbol->as.Struct_Or_Union_Field.type;
       AstExpr *arg_type = typecheck_expr(ast, field_type, Unresolved_Designator->expr);
@@ -1355,7 +1355,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
                 exit_error();
               }
 
-            AstSymbol *symbol = find_symbol(ast, Unresolved_Field->name, scope, expr->line_info);
+            AstSymbol *symbol = find_symbol_in_scope(ast, Unresolved_Field->name, scope, expr->line_info);
             assert(symbol->tag == Ast_Symbol_Enum_Value);
 
             // This needs to be done everytime we resolve expression to enum value. Could just check in the end if this expr was modified to enum value and do this.
@@ -1405,7 +1405,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
                 exit_error();
               }
 
-            AstSymbol *symbol = find_symbol(ast, Unresolved_Field->name, scope, expr->line_info);
+            AstSymbol *symbol = find_symbol_in_scope(ast, Unresolved_Field->name, scope, expr->line_info);
             assert(symbol->tag == Ast_Symbol_Struct_Field || symbol->tag == Ast_Symbol_Union_Field);
 
             if (Unresolved_Field->expr->flags & AST_EXPR_FLAG_IS_LVALUE)
@@ -1440,7 +1440,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               AstExprTypeEnum *Enum = &type_hint->as.Type.as.Enum;
 
-              AstSymbol *symbol = find_symbol(ast, Unresolved_Enum_Value->name, Enum->scope, expr->line_info);
+              AstSymbol *symbol = find_symbol_in_scope(ast, Unresolved_Enum_Value->name, Enum->scope, expr->line_info);
               assert(symbol->tag == Ast_Symbol_Enum_Value);
 
               if (ast->flags & AST_FLAG_IS_TYPECHECKING_ENUM)

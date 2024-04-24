@@ -40,6 +40,40 @@ find_symbol(Ast *ast, StringView name, Scope *scope, LineInfo line_info)
   exit_error();
 }
 
+AstSymbol *
+find_symbol_in_scope(Ast *ast, StringView name, Scope *scope, LineInfo line_info)
+{
+  AstSymbolKey key = {
+    .name = name,
+    .scope = scope,
+  };
+
+  AstSymbol *symbol = hash_table_find(&ast->symbols, &key);
+
+  if (symbol)
+    {
+      switch (symbol->tag)
+        {
+        case Ast_Symbol_Variable:
+        case Ast_Symbol_Parameter:
+          if (line_info.offset > symbol->line_info.offset)
+            return symbol;
+
+          break;
+        case Ast_Symbol_Procedure:
+        case Ast_Symbol_Type:
+        case Ast_Symbol_Alias:
+        case Ast_Symbol_Struct_Field:
+        case Ast_Symbol_Union_Field:
+        case Ast_Symbol_Enum_Value:
+          return symbol;
+        }
+    }
+
+  print_error_many_ln(ast->filepath, line_info, "symbol '%.*s' is not defined", FORMAT_STRING_VIEW(name));
+  exit_error();
+}
+
 void resolve_identifiers_expr(Ast *, AstExpr **);
 
 void
