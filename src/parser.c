@@ -1,5 +1,7 @@
 #define MAX_EXPR_COUNT 2
 
+#define UNNAMED_SYMBOL_NAME_PREFIX "unnamed"
+
 #define grab_token(parser) lexer_grab_token(&(parser)->lexer)
 #define putback_token(parser, token) lexer_putback_token(&(parser)->lexer, token)
 #define peek_ahead_token(parser, index) lexer_peek_ahead_token(&(parser)->lexer, index)
@@ -13,10 +15,12 @@ struct Parser
 {
   Lexer lexer;
   Arena arena;
+  LinkedList unnamed_symbols;
   HashTable symbols;
 
   Scope *current_scope;
   Scope *global_scope;
+  u32 last_symbol_id;
 };
 
 // Helps keep in sync 'parse_highest_prec_base' with 'parse_highest_prec'.
@@ -107,6 +111,18 @@ insert_symbol(Parser *p, Token *id_token)
   return symbol;
 }
 
+AstSymbol *
+insert_unnamed_symbol(Parser *p)
+{
+  AstSymbol *symbol = parser_malloc(p, sizeof(*symbol));
+
+  LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
+  LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
+  linked_list_insert_last(&p->unnamed_symbols, node);
+
+  return symbol;
+}
+
 int
 prec_of_op(TokenTag op)
 {
@@ -190,8 +206,8 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
           AstExpr *initializer = parse_expr(p);
           expr = parser_malloc(p, sizeof(*expr));
           *expr = (AstExpr){
-            .tag = Ast_Expr_Designator,
-            .as = { .Designator = {
+            .tag = Ast_Expr_Unresolved_Designator,
+            .as = { .Unresolved_Designator = {
                 .name = token.text,
                 .expr = initializer,
               } },
@@ -251,6 +267,7 @@ parse_type_proc(Parser *p, bool insert_params_into_table)
             .has_name = has_name,
           } },
         .name = param_id_token.text,
+        .id = p->last_symbol_id++,
         .line_info = param_id_token.line_info,
       };
 
@@ -289,9 +306,40 @@ parse_type_proc(Parser *p, bool insert_params_into_table)
   return result;
 }
 
-AstExprTypeStruct
-parse_struct_fields(Parser *p)
+AstSymbol *
+parse_struct_or_union(Parser *p)
 {
+  AstExprTypeTag tag = Ast_Expr_Type_Struct;
+  AstSymbolTag field_tag = Ast_Symbol_Struct_Field;
+
+  switch (peek_token(p))
+    {
+    case Token_Struct:
+      break;
+    case Token_Union:
+      tag = Ast_Expr_Type_Union;
+      field_tag = Ast_Symbol_Union_Field;
+      break;
+    default:
+      UNREACHABLE();
+    }
+
+  advance_token(p);
+
+  Token struct_id_token = grab_token(p);
+  AstSymbol *struct_symbol = NULL;
+
+  if (peek_token(p) == Token_Identifier)
+    {
+      advance_token(p);
+      struct_symbol = insert_symbol(p, &struct_id_token);
+    }
+  else
+    {
+      struct_symbol = insert_unnamed_symbol(p);
+      struct_id_token.text = STRING_VIEW_FROM_CSTRING(UNNAMED_SYMBOL_NAME_PREFIX);
+    }
+
   expect_token(p, Token_Open_Curly);
 
   push_scope(p);
@@ -310,11 +358,12 @@ parse_struct_fields(Parser *p)
 
       AstSymbol *symbol = insert_symbol(p, &id_token);
       *symbol = (AstSymbol){
-        .tag = Ast_Symbol_Struct_Field,
-        .as = { .Struct_Field = {
+        .tag = field_tag,
+        .as = { .Struct_Or_Union_Field = {
             .type = type,
           } },
         .name = id_token.text,
+        .id = p->last_symbol_id++,
         .line_info = id_token.line_info,
       };
 
@@ -334,23 +383,57 @@ parse_struct_fields(Parser *p)
 
   expect_token(p, Token_Close_Curly);
 
-  AstExprTypeStruct result = {
-    .fields = fields,
-    .scope = scope,
+  AstExpr *type = parser_malloc(p, sizeof(*type));
+  *type = (AstExpr){
+    .tag = Ast_Expr_Type,
+    .as = { .Type = {
+        .tag = tag,
+        .as = { .Struct_Or_Union = {
+            .fields = fields,
+            .scope = scope,
+          } },
+        .symbol = struct_symbol,
+      } },
+    .line_info = struct_id_token.line_info,
+  };
+  *struct_symbol = (AstSymbol){
+    .tag = Ast_Symbol_Type,
+    .as = { .Type = type },
+    .name = struct_id_token.text,
+    .id = p->last_symbol_id++,
+    .line_info = struct_id_token.line_info,
   };
 
-  return result;
+  return struct_symbol;
 }
 
-AstExprTypeEnum
-parse_enum_values(Parser *p)
+AstSymbol *
+parse_enum(Parser *p)
 {
+  expect_token(p, Token_Enum);
+
+  Token enum_id_token = grab_token(p);
+  AstExpr *type = parser_malloc(p, sizeof(*type));
+  AstSymbol *enum_symbol = NULL;
+
+  if (peek_token(p) == Token_Identifier)
+    {
+      advance_token(p);
+      enum_symbol = insert_symbol(p, &enum_id_token);
+    }
+  else
+    {
+      enum_symbol = insert_unnamed_symbol(p);
+      enum_id_token.text = STRING_VIEW_FROM_CSTRING(UNNAMED_SYMBOL_NAME_PREFIX);
+    }
+
   expect_token(p, Token_Open_Curly);
 
   push_scope(p);
 
   LinkedList values = { 0 };
   Scope *scope = p->current_scope;
+  AstSymbol *last_initialized_enum_value = NULL;
 
   TokenTag tt = peek_token(p);
   do
@@ -369,17 +452,21 @@ parse_enum_values(Parser *p)
       *symbol = (AstSymbol){
         .tag = Ast_Symbol_Enum_Value,
         .as = { .Enum_Value = {
-            .type = NULL,
+            .type = type,
             .expr = expr,
-            .depends_on = NULL,
+            .depends_on = expr ? NULL : last_initialized_enum_value,
           } },
         .name = id_token.text,
+        .id = p->last_symbol_id++,
         .line_info = id_token.line_info,
       };
 
       LinkedListNode *node = parser_malloc(p, sizeof(*node) + sizeof(symbol));
       LINKED_LIST_PUT_NODE_DATA(AstSymbol *, node, symbol);
       linked_list_insert_last(&values, node);
+
+      if (expr)
+        last_initialized_enum_value = symbol;
 
       tt = peek_token(p);
       if (tt != Token_End_Of_File && tt != Token_Close_Curly)
@@ -394,12 +481,27 @@ parse_enum_values(Parser *p)
 
   expect_token(p, Token_Close_Curly);
 
-  AstExprTypeEnum result = {
-    .values = values,
-    .scope = scope,
+  *type = (AstExpr){
+    .tag = Ast_Expr_Type,
+    .as = { .Type = {
+        .tag = Ast_Expr_Type_Enum,
+        .as = { .Enum = {
+            .values = values,
+            .scope = scope,
+          } },
+        .symbol = enum_symbol,
+      } },
+    .line_info = enum_id_token.line_info,
+  };
+  *enum_symbol = (AstSymbol){
+    .tag = Ast_Symbol_Type,
+    .as = { .Type = type },
+    .name = enum_id_token.text,
+    .id = p->last_symbol_id++,
+    .line_info = enum_id_token.line_info,
   };
 
-  return result;
+  return enum_symbol;
 }
 
 ExprStartTag
@@ -523,8 +625,8 @@ parse_highest_prec_base(Parser *p)
         expect_token(p, Token_Identifier);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
-          .tag = Ast_Expr_Enum_Identifier,
-          .as = { .Enum_Identifier = {
+          .tag = Ast_Expr_Unresolved_Enum_Value,
+          .as = { .Unresolved_Enum_Value = {
               .name = id_token.text,
               .scope = p->current_scope,
             } },
@@ -547,46 +649,21 @@ parse_highest_prec_base(Parser *p)
         return expr;
       }
     case Expr_Start_Unnamed_Struct_Type:
-      {
-        AstExprTypeStruct Struct = parse_struct_fields(p);
-        AstExpr *expr = parser_malloc(p, sizeof(*expr));
-        *expr = (AstExpr){
-          .tag = Ast_Expr_Type,
-          .as = { .Type = {
-              .tag = Ast_Expr_Type_Struct,
-              .as = { .Struct_Or_Union = Struct },
-            } },
-          .line_info = token.line_info,
-        };
-        return expr;
-      }
     case Expr_Start_Unnamed_Union_Type:
       {
-        AstExprTypeStruct Union = parse_struct_fields(p);
-        AstExpr *expr = parser_malloc(p, sizeof(*expr));
-        *expr = (AstExpr){
-          .tag = Ast_Expr_Type,
-          .as = { .Type = {
-              .tag = Ast_Expr_Type_Union,
-              .as = { .Struct_Or_Union = Union },
-            } },
-          .line_info = token.line_info,
-        };
-        return expr;
+        putback_token(p, &token);
+        AstSymbol *symbol = parse_struct_or_union(p);
+        assert(symbol->tag == Ast_Symbol_Type);
+
+        return symbol->as.Type;
       }
     case Expr_Start_Unnamed_Enum_Type:
       {
-        AstExprTypeEnum Enum = parse_enum_values(p);
-        AstExpr *expr = parser_malloc(p, sizeof(*expr));
-        *expr = (AstExpr){
-          .tag = Ast_Expr_Type,
-          .as = { .Type = {
-              .tag = Ast_Expr_Type_Enum,
-              .as = { .Enum = Enum },
-            } },
-          .line_info = token.line_info,
-        };
-        return expr;
+        putback_token(p, &token);
+        AstSymbol *symbol = parse_enum(p);
+        assert(symbol->tag == Ast_Symbol_Type);
+
+        return symbol->as.Type;
       }
     case Expr_Start_Cast:
       {
@@ -725,8 +802,8 @@ parse_highest_prec_base(Parser *p)
           {
             AstExpr *expr = parser_malloc(p, sizeof(*expr));
             *expr = (AstExpr){
-              .tag = Ast_Expr_Identifier,
-              .as = { .Identifier = {
+              .tag = Ast_Expr_Unresolved_Identifier,
+              .as = { .Unresolved_Identifier = {
                   .name = token.text,
                   .scope = p->current_scope,
                 } },
@@ -817,9 +894,9 @@ parse_highest_prec(Parser *p)
 
             AstExpr *new_base = parser_malloc(p, sizeof(*new_base));
             *new_base = (AstExpr){
-              .tag = Ast_Expr_Field_Access,
-              .as = { .Field_Access = {
-                  .lhs = base,
+              .tag = Ast_Expr_Unresolved_Field,
+              .as = { .Unresolved_Field = {
+                  .expr = base,
                   .name = token.text,
                 } },
               .line_info = token.line_info,
@@ -920,92 +997,17 @@ parse_symbol(Parser *p)
               .block = block,
             } },
           .name = id_token.text,
+          .id = p->last_symbol_id++,
           .line_info = id_token.line_info,
         };
 
         return symbol;
       }
     case Token_Struct:
-      {
-        advance_token(p);
-
-        Token id_token = grab_token(p);
-        expect_token(p, Token_Identifier);
-        AstExprTypeStruct Struct = parse_struct_fields(p);
-
-        AstExpr *type = parser_malloc(p, sizeof(*type));
-        *type = (AstExpr){
-          .tag = Ast_Expr_Type,
-          .as = { .Type = {
-              .tag = Ast_Expr_Type_Struct,
-              .as = { .Struct_Or_Union = Struct },
-            } },
-          .line_info = id_token.line_info,
-        };
-        AstSymbol *symbol = insert_symbol(p, &id_token);
-        *symbol = (AstSymbol){
-          .tag = Ast_Symbol_Type,
-          .as = { .Type = type },
-          .name = id_token.text,
-          .line_info = id_token.line_info,
-        };
-
-        return symbol;
-      }
     case Token_Union:
-      {
-        advance_token(p);
-
-        Token id_token = grab_token(p);
-        expect_token(p, Token_Identifier);
-        AstExprTypeStruct Union = parse_struct_fields(p);
-
-        AstExpr *type = parser_malloc(p, sizeof(*type));
-        *type = (AstExpr){
-          .tag = Ast_Expr_Type,
-          .as = { .Type = {
-              .tag = Ast_Expr_Type_Union,
-              .as = { .Struct_Or_Union = Union },
-            } },
-          .line_info = id_token.line_info,
-        };
-        AstSymbol *symbol = insert_symbol(p, &id_token);
-        *symbol = (AstSymbol){
-          .tag = Ast_Symbol_Type,
-          .as = { .Type = type },
-          .name = id_token.text,
-          .line_info = id_token.line_info,
-        };
-
-        return symbol;
-      }
+      return parse_struct_or_union(p);
     case Token_Enum:
-      {
-        advance_token(p);
-
-        Token id_token = grab_token(p);
-        expect_token(p, Token_Identifier);
-        AstExprTypeEnum Enum = parse_enum_values(p);
-
-        AstExpr *type = parser_malloc(p, sizeof(*type));
-        *type = (AstExpr){
-          .tag = Ast_Expr_Type,
-          .as = { .Type = {
-              .tag = Ast_Expr_Type_Enum,
-              .as = { .Enum = Enum },
-            } },
-          .line_info = id_token.line_info,
-        };
-        AstSymbol *symbol = insert_symbol(p, &id_token);
-        *symbol = (AstSymbol){
-          .tag = Ast_Symbol_Type,
-          .as = { .Type = type },
-          .name = id_token.text,
-          .line_info = id_token.line_info,
-        };
-
-        return symbol;
-      }
+      return parse_enum(p);
     case Token_Alias:
       {
         advance_token(p);
@@ -1021,6 +1023,7 @@ parse_symbol(Parser *p)
           .tag = Ast_Symbol_Alias,
           .as = { .Alias = type },
           .name = id_token.text,
+          .id = p->last_symbol_id++,
           .line_info = id_token.line_info,
         };
 
@@ -1049,6 +1052,7 @@ parse_symbol(Parser *p)
                   .expr = expr,
                 } },
               .name = id_token.text,
+              .id = p->last_symbol_id++,
               .line_info = id_token.line_info,
             };
 
@@ -1070,6 +1074,7 @@ parse_symbol(Parser *p)
                   .expr = expr,
                 } },
               .name = id_token.text,
+              .id = p->last_symbol_id++,
               .line_info = id_token.line_info,
             };
 
@@ -1425,6 +1430,8 @@ parse(const char *filepath)
     }
 
   assert(parser.current_scope == global_scope);
+
+  linked_list_concat(&parser.unnamed_symbols, &globals);
 
   Ast ast = {
     .globals = globals,

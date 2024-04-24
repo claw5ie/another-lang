@@ -66,8 +66,8 @@ struct AstSymbolProcedure
   AstStmtBlock block;
 };
 
-typedef struct AstSymbolStructField AstSymbolStructField;
-struct AstSymbolStructField
+typedef struct AstSymbolField AstSymbolField;
+struct AstSymbolField
 {
   AstExpr *type;
 };
@@ -95,7 +95,7 @@ union AstSymbolData
   AstSymbolParameter Parameter;
   AstSymbolProcedure Procedure;
   AstExpr *Type;
-  AstSymbolStructField Struct_Field;
+  AstSymbolField Struct_Or_Union_Field;
   AstSymbolEnumValue Enum_Value;
   AstExpr *Alias;
 };
@@ -111,6 +111,7 @@ enum AstSymbolTag
     Ast_Symbol_Procedure,
     Ast_Symbol_Type,
     Ast_Symbol_Struct_Field,
+    Ast_Symbol_Union_Field,
     Ast_Symbol_Enum_Value,
     Ast_Symbol_Alias,
   };
@@ -121,6 +122,7 @@ struct AstSymbol
   AstSymbolTag tag;
   AstSymbolData as;
   StringView name;
+  u32 id;
   LineInfo line_info;
   AstSymbolResolvingStage resolving_stage: 2;
   AstTypecheckingStage typechecking_stage: 2;
@@ -248,7 +250,7 @@ typedef struct AstExprFieldAccess AstExprFieldAccess;
 struct AstExprFieldAccess
 {
   AstExpr *lhs;
-  StringView name;
+  AstSymbol *symbol;
 };
 
 typedef struct AstExprCast2 AstExprCast2;
@@ -260,6 +262,13 @@ struct AstExprCast2
 
 typedef struct AstExprDesignator AstExprDesignator;
 struct AstExprDesignator
+{
+  AstSymbol *symbol;
+  AstExpr *expr;
+};
+
+typedef struct AstExprUnresolvedField AstExprUnresolvedField;
+struct AstExprUnresolvedField
 {
   StringView name;
   AstExpr *expr;
@@ -287,8 +296,10 @@ union AstExprData
   bool Bool;
   AstExprDesignator Designator;
   AstSymbol *Symbol;
-  AstExprIdentifier Enum_Identifier;
-  AstExprIdentifier Identifier;
+  AstExprUnresolvedField Unresolved_Field;
+  AstExprUnresolvedField Unresolved_Designator;
+  AstExprIdentifier Unresolved_Enum_Value;
+  AstExprIdentifier Unresolved_Identifier;
 };
 
 typedef u8 AstExprFlagsType;
@@ -310,8 +321,10 @@ enum AstExprTag
     Ast_Expr_Null,
     Ast_Expr_Designator,
     Ast_Expr_Symbol,
-    Ast_Expr_Enum_Identifier,
-    Ast_Expr_Identifier,
+    Ast_Expr_Unresolved_Field,
+    Ast_Expr_Unresolved_Designator,
+    Ast_Expr_Unresolved_Enum_Value,
+    Ast_Expr_Unresolved_Identifier,
   };
 typedef enum AstExprTag AstExprTag;
 

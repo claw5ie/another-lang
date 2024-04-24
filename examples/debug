@@ -41,7 +41,7 @@ proc main(bool, i32)
 
   c :: struct{ x :: i32 };
   d :: enum{ x };
-  alias Foo = union{ x :: i32 };
+  alias Foo = union{ x :: i32, foo :: i32 };
 
   aa ::= Bar.Hello;
   bb ::= b.x;
@@ -120,7 +120,7 @@ proc main(bool, i32)
   k :: i42 = jp**;
 
   xs :: i32[1][2] = _(_(2, 42));
-  xxs :: Foo[3] = _(Foo(x = 42), _(x = 69));
+  xxs :: Foo[3] = _(Foo(x = 42), _(x = 69), _(foo = 42));
 
   xs[2][42] = 42;
 

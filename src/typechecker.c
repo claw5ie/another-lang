@@ -489,7 +489,7 @@ eprint_expr(AstExpr *expr)
         AstExprFieldAccess *Field_Access = &expr->as.Field_Access;
 
         eprint_expr(Field_Access->lhs);
-        fprintf(stderr, ".%.*s", FORMAT_STRING_VIEW(Field_Access->name));
+        fprintf(stderr, ".%.*s", FORMAT_STRING_VIEW(Field_Access->symbol->name));
       }
 
       break;
@@ -518,7 +518,7 @@ eprint_expr(AstExpr *expr)
       {
         AstExprDesignator *Designator = &expr->as.Designator;
 
-        fprintf(stderr, "%.*s = ", FORMAT_STRING_VIEW(Designator->name));
+        fprintf(stderr, "%.*s = ", FORMAT_STRING_VIEW(Designator->symbol->name));
         eprint_expr(Designator->expr);
       }
 
@@ -535,8 +535,10 @@ eprint_expr(AstExpr *expr)
 
       break;
     case Ast_Expr_Cast1:
-    case Ast_Expr_Enum_Identifier:
-    case Ast_Expr_Identifier:
+    case Ast_Expr_Unresolved_Field:
+    case Ast_Expr_Unresolved_Designator:
+    case Ast_Expr_Unresolved_Enum_Value:
+    case Ast_Expr_Unresolved_Identifier:
       UNREACHABLE();
     }
 }
@@ -638,9 +640,9 @@ typecheck_struct_fields(Ast *ast, LinkedList *fields)
   for (LinkedListNode *node = fields->first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
-      AstSymbolStructField *Struct_Field = &symbol->as.Struct_Field;
+      AstSymbolField *Field = &symbol->as.Struct_Or_Union_Field;
 
-      typecheck_type(ast, Struct_Field->type);
+      typecheck_type(ast, Field->type);
     }
 }
 
@@ -761,24 +763,24 @@ typecheck_type(Ast *ast, AstExpr *expr)
 }
 
 void
-typecheck_struct(Ast *ast, AstExprTypeStruct *Struct, LinkedList *args, LineInfo line_info)
+typecheck_struct_or_union(Ast *ast, AstExprTypeStruct *Struct, LinkedList *args, LineInfo line_info)
 {
   LinkedListNode *arg_node = args->first;
   while (arg_node)
     {
       AstExpr *arg_expr = LINKED_LIST_GET_NODE_DATA(AstExpr *, arg_node);
 
-      if (arg_expr->tag != Ast_Expr_Designator)
+      if (arg_expr->tag != Ast_Expr_Unresolved_Designator)
         {
           print_error_ln(ast->filepath, line_info, "expected designator to construct a type");
           exit_error();
         }
 
-      AstExprDesignator *Designator = &arg_expr->as.Designator;
-      AstSymbol *symbol = find_symbol(ast, Designator->name, Struct->scope, line_info);
-      assert(symbol->tag == Ast_Symbol_Struct_Field);
-      AstExpr *field_type = symbol->as.Struct_Field.type;
-      AstExpr *arg_type = typecheck_expr(ast, field_type, Designator->expr);
+      AstExprUnresolvedField *Unresolved_Designator = &arg_expr->as.Unresolved_Designator;
+      AstSymbol *symbol = find_symbol(ast, Unresolved_Designator->name, Struct->scope, line_info);
+      assert(symbol->tag == Ast_Symbol_Struct_Field || symbol->tag == Ast_Symbol_Union_Field);
+      AstExpr *field_type = symbol->as.Struct_Or_Union_Field.type;
+      AstExpr *arg_type = typecheck_expr(ast, field_type, Unresolved_Designator->expr);
 
       if (!are_types_equal(field_type, arg_type))
         {
@@ -789,6 +791,13 @@ typecheck_struct(Ast *ast, AstExprTypeStruct *Struct, LinkedList *args, LineInfo
           eprint("'\n");
           exit_error();
         }
+
+      AstExpr *expr = Unresolved_Designator->expr;
+      arg_expr->tag = Ast_Expr_Designator;
+      arg_expr->as.Designator = (AstExprDesignator){
+        .symbol = symbol,
+        .expr = expr,
+      };
 
       arg_node = arg_node->next;
     }
@@ -1211,10 +1220,8 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
               return Lhs_Type;
             }
           case Ast_Expr_Type_Struct:
-            typecheck_struct(ast, &Lhs_Type->as.Type.as.Struct_Or_Union, &Type_Cons->args, expr->line_info);
-            return Lhs_Type;
           case Ast_Expr_Type_Union:
-            typecheck_struct(ast, &Lhs_Type->as.Type.as.Struct_Or_Union, &Type_Cons->args, expr->line_info);
+            typecheck_struct_or_union(ast, &Lhs_Type->as.Type.as.Struct_Or_Union, &Type_Cons->args, expr->line_info);
             return Lhs_Type;
           case Ast_Expr_Type_Generic_Int:
             UNREACHABLE();
@@ -1222,87 +1229,6 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
       }
 
       UNREACHABLE();
-    case Ast_Expr_Field_Access:
-      {
-        AstExprFieldAccess *Field_Access = &expr->as.Field_Access;
-
-        if (Field_Access->lhs->tag == Ast_Expr_Type)
-          {
-            AstExpr *lhs_type = Field_Access->lhs;
-            typecheck_type(ast, lhs_type);
-            Scope *scope = NULL;
-
-            switch (lhs_type->as.Type.tag)
-              {
-              case Ast_Expr_Type_Enum:
-                scope = lhs_type->as.Type.as.Enum.scope;
-                break;
-              default:
-                print_error(ast->filepath, expr->line_info, "expected 'enum', but got '");
-                eprint_type(lhs_type);
-                eprint("'\n");
-                exit_error();
-              }
-
-            AstSymbol *symbol = find_symbol(ast, Field_Access->name, scope, expr->line_info);
-            assert(symbol->tag == Ast_Symbol_Enum_Value);
-
-            // This needs to be done everytime we resolve expression to enum value. Could just check in the end if this expr was modified to enum value and do this.
-            if (ast->flags & AST_FLAG_IS_TYPECHECKING_ENUM)
-              typecheck_symbol(ast, symbol);
-
-            expr->tag = Ast_Expr_Symbol;
-            expr->as.Symbol = symbol;
-
-            return lhs_type;
-          }
-        else
-          {
-            AstExpr *lhs_type = typecheck_expr(ast, NULL, Field_Access->lhs);
-            Scope *scope = NULL;
-
-            switch (lhs_type->as.Type.tag)
-              {
-              case Ast_Expr_Type_Pointer:
-                {
-                  AstExpr *subtype = lhs_type->as.Type.as.Pointer;
-                  assert(subtype->tag == Ast_Expr_Type);
-
-                  switch (subtype->as.Type.tag)
-                    {
-                    case Ast_Expr_Type_Struct:
-                    case Ast_Expr_Type_Union:
-                      scope = subtype->as.Type.as.Struct_Or_Union.scope;
-                      break;
-                    default:
-                      print_error(ast->filepath, expr->line_info, "expected pointer to 'struct'/'union', but got '");
-                      eprint_type(lhs_type);
-                      eprint("'\n");
-                      exit_error();
-                    }
-                }
-
-                break;
-              case Ast_Expr_Type_Struct:
-              case Ast_Expr_Type_Union:
-                scope = lhs_type->as.Type.as.Struct_Or_Union.scope;
-                break;
-              default:
-                print_error(ast->filepath, expr->line_info, "expected 'struct'/'union' or pointer to 'struct'/'union', but got '");
-                eprint_type(lhs_type);
-                eprint("'\n");
-                exit_error();
-              }
-
-            AstSymbol *symbol = find_symbol(ast, Field_Access->name, scope, expr->line_info);
-            assert(symbol->tag == Ast_Symbol_Struct_Field);
-
-            if (Field_Access->lhs->flags & AST_EXPR_FLAG_IS_LVALUE)
-              expr->flags |= AST_EXPR_FLAG_IS_LVALUE;
-
-            return symbol->as.Struct_Field.type;
-          }
-      }
     case Ast_Expr_Cast1:
       {
         if (!type_hint)
@@ -1362,9 +1288,6 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
       return &g_bool_type;
     case Ast_Expr_Null:
       return &g_null_type;
-    case Ast_Expr_Designator:
-      print_error_ln(ast->filepath, expr->line_info, "unexpected designator");
-      exit_error();
     case Ast_Expr_Symbol:
       {
         AstSymbol *symbol = expr->as.Symbol;
@@ -1402,6 +1325,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             return symbol->as.Procedure.type;
           case Ast_Symbol_Type:
           case Ast_Symbol_Struct_Field:
+          case Ast_Symbol_Union_Field:
           case Ast_Symbol_Enum_Value:
           case Ast_Symbol_Alias:
             UNREACHABLE();
@@ -1409,7 +1333,98 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
       }
 
       UNREACHABLE();
-    case Ast_Expr_Enum_Identifier:
+    case Ast_Expr_Unresolved_Field:
+      {
+        AstExprUnresolvedField *Unresolved_Field = &expr->as.Unresolved_Field;
+
+        if (Unresolved_Field->expr->tag == Ast_Expr_Type)
+          {
+            AstExpr *lhs_type = Unresolved_Field->expr;
+            typecheck_type(ast, lhs_type);
+            Scope *scope = NULL;
+
+            switch (lhs_type->as.Type.tag)
+              {
+              case Ast_Expr_Type_Enum:
+                scope = lhs_type->as.Type.as.Enum.scope;
+                break;
+              default:
+                print_error(ast->filepath, expr->line_info, "expected 'enum', but got '");
+                eprint_type(lhs_type);
+                eprint("'\n");
+                exit_error();
+              }
+
+            AstSymbol *symbol = find_symbol(ast, Unresolved_Field->name, scope, expr->line_info);
+            assert(symbol->tag == Ast_Symbol_Enum_Value);
+
+            // This needs to be done everytime we resolve expression to enum value. Could just check in the end if this expr was modified to enum value and do this.
+            if (ast->flags & AST_FLAG_IS_TYPECHECKING_ENUM)
+              typecheck_symbol(ast, symbol);
+
+            expr->tag = Ast_Expr_Symbol;
+            expr->as.Symbol = symbol;
+
+            return lhs_type;
+          }
+        else
+          {
+            AstExpr *lhs_type = typecheck_expr(ast, NULL, Unresolved_Field->expr);
+            Scope *scope = NULL;
+
+            switch (lhs_type->as.Type.tag)
+              {
+              case Ast_Expr_Type_Pointer:
+                {
+                  AstExpr *subtype = lhs_type->as.Type.as.Pointer;
+                  assert(subtype->tag == Ast_Expr_Type);
+
+                  switch (subtype->as.Type.tag)
+                    {
+                    case Ast_Expr_Type_Struct:
+                    case Ast_Expr_Type_Union:
+                      scope = subtype->as.Type.as.Struct_Or_Union.scope;
+                      break;
+                    default:
+                      print_error(ast->filepath, expr->line_info, "expected pointer to 'struct'/'union', but got '");
+                      eprint_type(lhs_type);
+                      eprint("'\n");
+                      exit_error();
+                    }
+                }
+
+                break;
+              case Ast_Expr_Type_Struct:
+              case Ast_Expr_Type_Union:
+                scope = lhs_type->as.Type.as.Struct_Or_Union.scope;
+                break;
+              default:
+                print_error(ast->filepath, expr->line_info, "expected 'struct'/'union' or pointer to 'struct'/'union', but got '");
+                eprint_type(lhs_type);
+                eprint("'\n");
+                exit_error();
+              }
+
+            AstSymbol *symbol = find_symbol(ast, Unresolved_Field->name, scope, expr->line_info);
+            assert(symbol->tag == Ast_Symbol_Struct_Field || symbol->tag == Ast_Symbol_Union_Field);
+
+            if (Unresolved_Field->expr->flags & AST_EXPR_FLAG_IS_LVALUE)
+              expr->flags |= AST_EXPR_FLAG_IS_LVALUE;
+
+            AstExpr *lhs = Unresolved_Field->expr;
+            expr->tag = Ast_Expr_Field_Access;
+            expr->as.Field_Access = (AstExprFieldAccess){
+              .lhs = lhs,
+              .symbol = symbol,
+            };
+
+            return symbol->as.Struct_Or_Union_Field.type;
+          }
+      }
+    case Ast_Expr_Unresolved_Designator:
+      print_error_ln(ast->filepath, expr->line_info, "unexpected designator");
+      exit_error();
+    case Ast_Expr_Unresolved_Enum_Value:
       {
         if (!type_hint)
           {
@@ -1417,7 +1432,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             exit_error();
           }
 
-        AstExprIdentifier *Enum_Identifier = &expr->as.Enum_Identifier;
+        AstExprIdentifier *Unresolved_Enum_Value = &expr->as.Unresolved_Enum_Value;
 
         switch (type_hint->as.Type.tag)
           {
@@ -1425,7 +1440,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             {
               AstExprTypeEnum *Enum = &type_hint->as.Type.as.Enum;
 
-              AstSymbol *symbol = find_symbol(ast, Enum_Identifier->name, Enum->scope, expr->line_info);
+              AstSymbol *symbol = find_symbol(ast, Unresolved_Enum_Value->name, Enum->scope, expr->line_info);
               assert(symbol->tag == Ast_Symbol_Enum_Value);
 
               if (ast->flags & AST_FLAG_IS_TYPECHECKING_ENUM)
@@ -1443,7 +1458,9 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             exit_error();
           }
       }
-    case Ast_Expr_Identifier:
+    case Ast_Expr_Field_Access:
+    case Ast_Expr_Designator:
+    case Ast_Expr_Unresolved_Identifier:
       UNREACHABLE();
     }
 
@@ -1565,6 +1582,7 @@ typecheck_symbol(Ast *ast, AstSymbol *symbol)
 
       break;
     case Ast_Symbol_Struct_Field:
+    case Ast_Symbol_Union_Field:
     case Ast_Symbol_Alias:
       UNREACHABLE();
     }

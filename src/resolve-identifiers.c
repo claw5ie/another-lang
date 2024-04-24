@@ -24,6 +24,7 @@ find_symbol(Ast *ast, StringView name, Scope *scope, LineInfo line_info)
             case Ast_Symbol_Type:
             case Ast_Symbol_Alias:
             case Ast_Symbol_Struct_Field:
+            case Ast_Symbol_Union_Field:
             case Ast_Symbol_Enum_Value:
               return symbol;
             }
@@ -70,9 +71,9 @@ resolve_identifiers_struct_fields(Ast *ast, LinkedList *fields)
   for (LinkedListNode *node = fields->first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
-      AstSymbolStructField *Struct_Field = &symbol->as.Struct_Field;
+      AstSymbolField *Field = &symbol->as.Struct_Or_Union_Field;
 
-      resolve_identifiers_expr(ast, &Struct_Field->type);
+      resolve_identifiers_expr(ast, &Field->type);
     }
 }
 
@@ -131,23 +132,14 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
       {
         AstExprTypeEnum *Enum = &Type->as.Enum;
 
-        AstSymbol *last_initialized_enum_value = NULL;
-
         for (LinkedListNode *node = Enum->values.first; node; node = node->next)
           {
             AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
             AstSymbolEnumValue *Enum_Value = &symbol->as.Enum_Value;
             assert(symbol->tag == Ast_Symbol_Enum_Value);
 
-            Enum_Value->type = expr;
-
             if (Enum_Value->expr)
-              {
-                last_initialized_enum_value = symbol;
-                resolve_identifiers_expr(ast, &Enum_Value->expr);
-              }
-            else
-              Enum_Value->depends_on = last_initialized_enum_value;
+              resolve_identifiers_expr(ast, &Enum_Value->expr);
           }
       }
 
@@ -231,14 +223,6 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
       }
 
       break;
-    case Ast_Expr_Field_Access:
-      {
-        AstExprFieldAccess *Field_Access = &expr->as.Field_Access;
-
-        resolve_identifiers_expr(ast, &Field_Access->lhs);
-      }
-
-      break;
     case Ast_Expr_Cast1:
       resolve_identifiers_expr(ast, &expr->as.Cast1);
       break;
@@ -254,14 +238,34 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
     case Ast_Expr_Type:
       resolve_identifiers_type(ast, expr_ptr);
       break;
-    case Ast_Expr_Enum_Identifier:
+    case Ast_Expr_Int64:
+    case Ast_Expr_Bool:
+    case Ast_Expr_Null:
       break;
-    case Ast_Expr_Identifier:
+    case Ast_Expr_Unresolved_Field:
       {
-        AstExprIdentifier *Identifier = &expr->as.Identifier;
+        AstExprUnresolvedField *Unresolved_Field = &expr->as.Unresolved_Field;
+
+        resolve_identifiers_expr(ast, &Unresolved_Field->expr);
+      }
+
+      break;
+    case Ast_Expr_Unresolved_Designator:
+      {
+        AstExprUnresolvedField *Unresolved_Designator = &expr->as.Unresolved_Designator;
+
+        resolve_identifiers_expr(ast, &Unresolved_Designator->expr);
+      }
+
+      break;
+    case Ast_Expr_Unresolved_Enum_Value:
+      break;
+    case Ast_Expr_Unresolved_Identifier:
+      {
+        AstExprIdentifier *Unresolved_Identifier = &expr->as.Unresolved_Identifier;
 
         // Should I rely on expressions line info? What if it doesn't start identifier?
-        AstSymbol *symbol = find_symbol(ast, Identifier->name, Identifier->scope, expr->line_info);
+        AstSymbol *symbol = find_symbol(ast, Unresolved_Identifier->name, Unresolved_Identifier->scope, expr->line_info);
 
         switch (symbol->tag)
           {
@@ -282,18 +286,8 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
       }
 
       break;
-    case Ast_Expr_Int64:
-    case Ast_Expr_Bool:
-    case Ast_Expr_Null:
-      break;
+    case Ast_Expr_Field_Access:
     case Ast_Expr_Designator:
-      {
-        AstExprDesignator *Designator = &expr->as.Designator;
-
-        resolve_identifiers_expr(ast, &Designator->expr);
-      }
-
-      break;
     case Ast_Expr_Symbol:
       UNREACHABLE();
     }
@@ -354,7 +348,7 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
       break;
     case Ast_Symbol_Alias:
       {
-        if (symbol->as.Alias->tag == Ast_Expr_Identifier)
+        if (symbol->as.Alias->tag == Ast_Expr_Unresolved_Identifier)
           symbol->flags |= AST_SYMBOL_FLAG_IS_UNPACKED;
 
         resolve_identifiers_expr(ast, &symbol->as.Alias);
@@ -376,6 +370,7 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
 
       break;
     case Ast_Symbol_Struct_Field:
+    case Ast_Symbol_Union_Field:
     case Ast_Symbol_Enum_Value:
       UNREACHABLE();
     }

@@ -1,9 +1,10 @@
-// TODO: prefix enum values do avoid name collisions.
-//       round int types to closest power of two.
+// TODO: round int types to closest power of two.
 //       add bit fields.
-//       generate name for unnamed types, 'cause can't assign a structure with unnamed type to a variable with infered type.
+//       don't use find_symbol to search for fields and enums.
 
 #define TAB_SIZE 2
+#define SYMBOL_NAME_SPECIFIER "%.*s_0x%x"
+#define FORMAT_SYMBOL_NAME(symbol) FORMAT_STRING_VIEW((symbol)->name), (symbol)->id
 
 #define put_string(string) fputs(string, stdout)
 
@@ -46,7 +47,7 @@ transpile_to_c_type_proc_params(AstExprTypeProc *proc, size_t ident)
 
       transpile_to_c_expr(Parameter->type, ident);
       if (Parameter->has_name)
-        printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+        printf(" " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
 
       if (node->next)
         put_string(", ");
@@ -62,12 +63,11 @@ transpile_to_c_struct_fields(LinkedList *fields, size_t ident)
   for (LinkedListNode *node = fields->first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
-      AstSymbolStructField *Struct_Field = &symbol->as.Struct_Field;
+      AstSymbolField *Field = &symbol->as.Struct_Or_Union_Field;
 
       put_spaces(ident + TAB_SIZE);
-      transpile_to_c_expr(Struct_Field->type, ident);
-      put_string(" ");
-      printf("%.*s;\n", FORMAT_STRING_VIEW(symbol->name));
+      transpile_to_c_expr(Field->type, ident);
+      printf(" " SYMBOL_NAME_SPECIFIER ";\n", FORMAT_SYMBOL_NAME(symbol));
     }
   put_spaces(ident);
   put_string("}");
@@ -84,7 +84,7 @@ transpile_to_c_enum_values(LinkedList *values, size_t ident)
       AstSymbolEnumValue *Enum_Value = &symbol->as.Enum_Value;
 
       put_spaces(ident + TAB_SIZE);
-      printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
+      printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
       if (Enum_Value->expr)
         {
           put_string(" = ");
@@ -216,7 +216,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
 
         transpile_to_c_expr(Field_Access->lhs, ident);
         put_string(".");
-        printf("%.*s", FORMAT_STRING_VIEW(Field_Access->name));
+        printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Field_Access->symbol));
       }
 
       break;
@@ -254,7 +254,7 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       {
         AstExprDesignator *Designator = &expr->as.Designator;
 
-        printf(".%.*s = ", FORMAT_STRING_VIEW(Designator->name));
+        printf("." SYMBOL_NAME_SPECIFIER " = ", FORMAT_SYMBOL_NAME(Designator->symbol));
         transpile_to_c_expr(Designator->expr, ident);
       }
 
@@ -266,13 +266,15 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
       {
         AstSymbol *Symbol = expr->as.Symbol;
 
-        printf("%.*s", FORMAT_STRING_VIEW(Symbol->name));
+        printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Symbol));
       }
 
       break;
     case Ast_Expr_Cast1:
-    case Ast_Expr_Enum_Identifier:
-    case Ast_Expr_Identifier:
+    case Ast_Expr_Unresolved_Field:
+    case Ast_Expr_Unresolved_Designator:
+    case Ast_Expr_Unresolved_Enum_Value:
+    case Ast_Expr_Unresolved_Identifier:
       UNREACHABLE();
     }
 }
@@ -296,7 +298,7 @@ transpile_to_c_type_array(AstExpr *type, AstSymbol *symbol, size_t ident)
     default:
       transpile_to_c_type(type, ident);
       if (symbol)
-        printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+        printf(" " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
     }
 }
 
@@ -339,7 +341,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
         transpile_to_c_type_with_symbol(Proc->return_type, NULL, ident);
         put_string(" (*");
         if (symbol)
-          printf("%.*s", FORMAT_STRING_VIEW(symbol->name));
+          printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
         put_string(")");
         transpile_to_c_type_proc_params(Proc, ident);
       }
@@ -351,7 +353,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
       break;
     case Ast_Expr_Type_Struct:
       if (Type->symbol)
-        printf("struct %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
+        printf("struct " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Type->symbol));
       else
         {
           AstExprTypeStruct *Struct = &Type->as.Struct_Or_Union;
@@ -363,7 +365,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
       break;
     case Ast_Expr_Type_Union:
       if (Type->symbol)
-        printf("union %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
+        printf("union " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Type->symbol));
       else
         {
           AstExprTypeStruct *Union = &Type->as.Struct_Or_Union;
@@ -375,7 +377,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
       break;
     case Ast_Expr_Type_Enum:
       if (Type->symbol)
-        printf("enum %.*s", FORMAT_STRING_VIEW(Type->symbol->name));
+        printf("enum " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Type->symbol));
       else
         {
           AstExprTypeEnum *Enum = &Type->as.Enum;
@@ -388,7 +390,7 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
     }
 
   if (should_print_symbol_name && symbol)
-    printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+    printf(" " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
 }
 
 void
@@ -439,7 +441,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
 
         put_spaces(ident);
         transpile_to_c_type(Proc->return_type, ident);
-        printf(" %.*s", FORMAT_STRING_VIEW(symbol->name));
+        printf(" " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
         transpile_to_c_type_proc_params(Proc, ident);
         put_string("\n");
         transpile_to_c_stmt_block(&Procedure->block, ident);
@@ -457,13 +459,21 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
             put_spaces(ident);
 
             AstExprType *Expr_Type = &Type->as.Type;
+
+            // If aliasing unnamed type, just typedef it, since it's already defined.
+            if (symbol != Expr_Type->symbol)
+              {
+                printf("typedef " SYMBOL_NAME_SPECIFIER " " SYMBOL_NAME_SPECIFIER ";\n", FORMAT_SYMBOL_NAME(Expr_Type->symbol), FORMAT_SYMBOL_NAME(symbol));
+                return;
+              }
+
             switch (Expr_Type->tag)
               {
               case Ast_Expr_Type_Struct:
                 {
                   AstExprTypeStruct *Struct = &Expr_Type->as.Struct_Or_Union;
 
-                  printf("struct %.*s\n", FORMAT_STRING_VIEW(symbol->name));
+                  printf("struct " SYMBOL_NAME_SPECIFIER "\n", FORMAT_SYMBOL_NAME(symbol));
                   transpile_to_c_struct_fields(&Struct->fields, ident);
                   put_string(";\n");
                 }
@@ -473,7 +483,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
                 {
                   AstExprTypeStruct *Union = &Expr_Type->as.Struct_Or_Union;
 
-                  printf("union %.*s\n", FORMAT_STRING_VIEW(symbol->name));
+                  printf("union " SYMBOL_NAME_SPECIFIER "\n", FORMAT_SYMBOL_NAME(symbol));
                   transpile_to_c_struct_fields(&Union->fields, ident);
                   put_string(";\n");
                 }
@@ -483,7 +493,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
                 {
                   AstExprTypeEnum *Enum = &Expr_Type->as.Enum;
 
-                  printf("enum %.*s\n", FORMAT_STRING_VIEW(symbol->name));
+                  printf("enum " SYMBOL_NAME_SPECIFIER "\n", FORMAT_SYMBOL_NAME(symbol));
                   transpile_to_c_enum_values(&Enum->values, ident + TAB_SIZE);
                   put_string(";\n");
                 }
@@ -499,6 +509,7 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
 
       break;
     case Ast_Symbol_Struct_Field:
+    case Ast_Symbol_Union_Field:
     case Ast_Symbol_Enum_Value:
     case Ast_Symbol_Alias:
       UNREACHABLE();
