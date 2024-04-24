@@ -90,18 +90,22 @@ linked_list_remove_node(LinkedList *list, LinkedListNode *node)
 void
 linked_list_concat(LinkedList *self, LinkedList *other)
 {
-  if (self->last)
-    self->last->next = other->first;
+  if (self->count == 0)
+    *self = *other;
+  else if (other->count == 0)
+    *other = *self;
+  else
+    {
+      self->last->next = other->first;
+      other->first->prev = self->last;
 
-  if (other->first)
-    other->first->prev = self->last;
+      self->last = other->last;
+      other->first = self->first;
 
-  self->last = other->last;
-  other->first = self->first;
-
-  size_t new_count = self->count + other->count;
-  self->count = new_count;
-  other->count = new_count;
+      size_t new_count = self->count + other->count;
+      self->count = new_count;
+      other->count = new_count;
+    }
 }
 
 #define ARENA_BLOCK_DEFAULT_CAPACITY (4 * 1024)
