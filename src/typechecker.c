@@ -766,7 +766,7 @@ typecheck_type(Ast *ast, AstExpr *expr)
 }
 
 void
-typecheck_struct_or_union(Ast *ast, AstExprTypeStruct *Struct, LinkedList *args, LineInfo line_info)
+typecheck_struct_or_union_constructor(Ast *ast, AstExprTypeStruct *Struct, LinkedList *args, LineInfo line_info)
 {
   LinkedListNode *arg_node = args->first;
   while (arg_node)
@@ -935,7 +935,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
           case Ast_Expr_Binary_Op_Div:
           case Ast_Expr_Binary_Op_Mod:
             {
-              AstExprType Type = {0 };
+              AstExprType Type = { 0 };
 
               if (!are_int_types_compatible(&Type, lhs_type, rhs_type))
                 {
@@ -1224,7 +1224,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             }
           case Ast_Expr_Type_Struct:
           case Ast_Expr_Type_Union:
-            typecheck_struct_or_union(ast, &Lhs_Type->as.Type.as.Struct_Or_Union, &Type_Cons->args, expr->line_info);
+            typecheck_struct_or_union_constructor(ast, &Lhs_Type->as.Type.as.Struct_Or_Union, &Type_Cons->args, expr->line_info);
             return Lhs_Type;
           case Ast_Expr_Type_Generic_Int:
             UNREACHABLE();
