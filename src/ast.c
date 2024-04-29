@@ -136,8 +136,8 @@ struct AstExprTypeInt
   bool is_signed;
 };
 
-typedef struct AstExprTypeProc AstExprTypeProc;
-struct AstExprTypeProc
+typedef struct AstExprTypeProcedure AstExprTypeProcedure;
+struct AstExprTypeProcedure
 {
   LinkedList params;
   AstExpr *return_type;
@@ -169,7 +169,7 @@ union AstExprTypeData
 {
   AstExprTypeInt Int;
   AstExpr *Pointer;
-  AstExprTypeProc Proc;
+  AstExprTypeProcedure Procedure;
   AstExprArrayAccess Array;
   AstExprTypeStruct Struct_Or_Union;
   AstExprTypeEnum Enum;
@@ -182,7 +182,7 @@ enum AstExprTypeTag
     Ast_Expr_Type_Int,
     Ast_Expr_Type_Generic_Int,
     Ast_Expr_Type_Pointer,
-    Ast_Expr_Type_Proc,
+    Ast_Expr_Type_Procedure,
     Ast_Expr_Type_Array,
     Ast_Expr_Type_Struct,
     Ast_Expr_Type_Union,

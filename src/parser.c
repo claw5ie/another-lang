@@ -234,12 +234,12 @@ parse_comma_separated_exprs(Parser *p, TokenTag start_list, TokenTag end_list)
   return exprs;
 }
 
-AstExprTypeProc
-parse_type_proc(Parser *p, bool insert_params_into_table)
+AstExprTypeProcedure
+parse_type_procedure(Parser *p, bool insert_params_into_table)
 {
   expect_token(p, Token_Open_Paren);
 
-  AstExprTypeProc result = {
+  AstExprTypeProcedure result = {
     .scope = p->current_scope,
   };
 
@@ -636,13 +636,13 @@ parse_highest_prec_base(Parser *p)
       }
     case Expr_Start_Procedure_Type:
       {
-        AstExprTypeProc Proc = parse_type_proc(p, false);
+        AstExprTypeProcedure Procedure = parse_type_procedure(p, false);
         AstExpr *expr = parser_malloc(p, sizeof(*expr));
         *expr = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
-              .tag = Ast_Expr_Type_Proc,
-              .as = { .Proc = Proc },
+              .tag = Ast_Expr_Type_Procedure,
+              .as = { .Procedure = Procedure },
             } },
           .line_info = token.line_info,
         };
@@ -975,7 +975,7 @@ parse_symbol(Parser *p)
 
         push_scope(p);
 
-        AstExprTypeProc Proc = parse_type_proc(p, true);
+        AstExprTypeProcedure Procedure = parse_type_procedure(p, true);
         AstStmtBlock block = parse_stmt_block(p);
 
         pop_scope(p);
@@ -984,8 +984,8 @@ parse_symbol(Parser *p)
         *type = (AstExpr){
           .tag = Ast_Expr_Type,
           .as = { .Type = {
-              .tag = Ast_Expr_Type_Proc,
-              .as = { .Proc = Proc },
+              .tag = Ast_Expr_Type_Procedure,
+              .as = { .Procedure = Procedure },
             } },
           .line_info = id_token.line_info,
         };

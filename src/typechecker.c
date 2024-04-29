@@ -84,7 +84,7 @@ compare_type(AstExpr *type)
         }
 
       break;
-    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Procedure:
       flags |= TYPE_IS_POINTER | TYPE_IS_COMPARABLE | TYPE_HAS_ORDER;
       break;
     case Ast_Expr_Type_Array:
@@ -155,7 +155,7 @@ can_cast_to_type(AstExpr *to_cast, AstExpr *type)
     case Ast_Expr_Type_Int:
     case Ast_Expr_Type_Generic_Int:
     case Ast_Expr_Type_Pointer:
-    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Procedure:
     case Ast_Expr_Type_Enum:
       switch (Type->tag)
         {
@@ -163,7 +163,7 @@ can_cast_to_type(AstExpr *to_cast, AstExpr *type)
         case Ast_Expr_Type_Int:
         case Ast_Expr_Type_Generic_Int:
         case Ast_Expr_Type_Pointer:
-        case Ast_Expr_Type_Proc:
+        case Ast_Expr_Type_Procedure:
         case Ast_Expr_Type_Enum:
           return true;
         case Ast_Expr_Type_Array:
@@ -313,23 +313,23 @@ are_types_equal(AstExpr *lhs_type, AstExpr *rhs_type)
         else
           return are_types_equal(Lhs_Type->as.Pointer, Rhs_Type->as.Pointer);
       }
-    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Procedure:
       {
         TypeFlagsType rhs_flags = compare_type(rhs_type);
 
         if (is_pointer_to_void(rhs_flags))
           return true;
-        else if (Rhs_Type->tag != Ast_Expr_Type_Proc)
+        else if (Rhs_Type->tag != Ast_Expr_Type_Procedure)
           return false;
 
-        AstExprTypeProc *Lhs_Proc = &Lhs_Type->as.Proc;
-        AstExprTypeProc *Rhs_Proc = &Rhs_Type->as.Proc;
+        AstExprTypeProcedure *Lhs_Procedure = &Lhs_Type->as.Procedure;
+        AstExprTypeProcedure *Rhs_Procedure = &Rhs_Type->as.Procedure;
 
-        if (Lhs_Proc->params.count != Rhs_Proc->params.count)
+        if (Lhs_Procedure->params.count != Rhs_Procedure->params.count)
           return false;
 
-        LinkedListNode *lhs_node = Lhs_Proc->params.first;
-        LinkedListNode *rhs_node = Rhs_Proc->params.first;
+        LinkedListNode *lhs_node = Lhs_Procedure->params.first;
+        LinkedListNode *rhs_node = Rhs_Procedure->params.first;
         while (lhs_node)
           {
             AstSymbolParameter *Lhs_Parameter = &LINKED_LIST_GET_NODE_DATA(AstSymbol *, lhs_node)->as.Parameter;
@@ -342,7 +342,7 @@ are_types_equal(AstExpr *lhs_type, AstExpr *rhs_type)
             rhs_node = rhs_node->next;
           }
 
-        return are_types_equal(Lhs_Proc->return_type, Rhs_Proc->return_type);
+        return are_types_equal(Lhs_Procedure->return_type, Rhs_Procedure->return_type);
       }
     case Ast_Expr_Type_Array:
       {
@@ -578,12 +578,12 @@ eprint_type(AstExpr *type)
       eprint_type(Type->as.Pointer);
       fputc('*', stderr);
       break;
-    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Procedure:
       {
-        AstExprTypeProc *Proc = &Type->as.Proc;
+        AstExprTypeProcedure *Procedure = &Type->as.Procedure;
 
-        fputs("proc(", stderr);
-        for (LinkedListNode *node = Proc->params.first; node; node = node->next)
+        fputs("procedure(", stderr);
+        for (LinkedListNode *node = Procedure->params.first; node; node = node->next)
           {
             AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
             AstSymbolParameter *Parameter = &symbol->as.Parameter;
@@ -594,7 +594,7 @@ eprint_type(AstExpr *type)
               fputs(", ", stderr);
           }
         fputs(") -> ", stderr);
-        eprint_type(Proc->return_type);
+        eprint_type(Procedure->return_type);
       }
 
       break;
@@ -622,7 +622,7 @@ eprint_type(AstExpr *type)
 }
 
 void
-typecheck_type_proc(Ast *ast, AstExprTypeProc *type)
+typecheck_type_procedure(Ast *ast, AstExprTypeProcedure *type)
 {
   for (LinkedListNode *node = type->params.first; node; node = node->next)
     {
@@ -696,13 +696,13 @@ typecheck_type(Ast *ast, AstExpr *expr)
       }
 
       break;
-    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Procedure:
       {
-        AstExprTypeProc *Proc = &Type->as.Proc;
+        AstExprTypeProcedure *Procedure = &Type->as.Procedure;
 
         ast->flags &= ~AST_FLAG_REJECT_VOID_TYPE;
         ast->flags |= AST_FLAG_SKIP_CYCLE;
-        typecheck_type_proc(ast, Proc);
+        typecheck_type_procedure(ast, Procedure);
       }
 
       break;
@@ -1103,7 +1103,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
 
         AstExpr *lhs_type = typecheck_expr(ast, NULL, Call->lhs);
 
-        if (lhs_type->as.Type.tag != Ast_Expr_Type_Proc)
+        if (lhs_type->as.Type.tag != Ast_Expr_Type_Procedure)
           {
             print_error(ast->filepath, expr->line_info, "'");
             eprint_type(lhs_type);
@@ -1111,15 +1111,15 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             exit_error();
           }
 
-        AstExprTypeProc *Proc = &lhs_type->as.Type.as.Proc;
+        AstExprTypeProcedure *Procedure = &lhs_type->as.Type.as.Procedure;
 
-        if (Proc->params.count != Call->args.count)
+        if (Procedure->params.count != Call->args.count)
           {
-            print_error_many_ln(ast->filepath, expr->line_info, "expected %zu arguments, but got %zu", Proc->params.count, Call->args.count);
+            print_error_many_ln(ast->filepath, expr->line_info, "expected %zu arguments, but got %zu", Procedure->params.count, Call->args.count);
             exit_error();
           }
 
-        LinkedListNode *param_node = Proc->params.first;
+        LinkedListNode *param_node = Procedure->params.first;
         LinkedListNode *arg_node = Call->args.first;
         while (param_node)
           {
@@ -1141,7 +1141,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
             arg_node = arg_node->next;
           }
 
-        return Proc->return_type;
+        return Procedure->return_type;
       }
     case Ast_Expr_Type_Cons:
       {
@@ -1170,7 +1170,7 @@ typecheck_expr(Ast *ast, AstExpr *type_hint, AstExpr *expr)
           case Ast_Expr_Type_Bool:
           case Ast_Expr_Type_Int:
           case Ast_Expr_Type_Pointer:
-          case Ast_Expr_Type_Proc:
+          case Ast_Expr_Type_Procedure:
           case Ast_Expr_Type_Enum:
             {
               if (Type_Cons->args.count != 1)
@@ -1539,11 +1539,11 @@ typecheck_symbol(Ast *ast, AstSymbol *symbol)
       {
         AstSymbolProcedure *Procedure = &symbol->as.Procedure;
 
-        AstExprTypeProc *Proc = &Procedure->type->as.Type.as.Proc;
-        typecheck_type_proc(ast, Proc);
+        AstExprTypeProcedure *Type_Procedure = &Procedure->type->as.Type.as.Procedure;
+        typecheck_type_procedure(ast, Type_Procedure);
 
         AstExpr *old_return_type = ast->return_type;
-        ast->return_type = Proc->return_type;
+        ast->return_type = Type_Procedure->return_type;
 
         typecheck_stmt_block(ast, &Procedure->block);
 

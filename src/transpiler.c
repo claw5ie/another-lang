@@ -39,10 +39,10 @@ transpile_to_c_expr_list(LinkedList *list, size_t ident)
 }
 
 void
-transpile_to_c_type_proc_params(AstExprTypeProc *proc, size_t ident)
+transpile_to_c_type_procedure_params(AstExprTypeProcedure *procedure, size_t ident)
 {
   put_string("(");
-  for (LinkedListNode *node = proc->params.first; node; node = node->next)
+  for (LinkedListNode *node = procedure->params.first; node; node = node->next)
     {
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       AstSymbolParameter *Parameter = &symbol->as.Parameter;
@@ -334,18 +334,18 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
       transpile_to_c_type_with_symbol(Type->as.Pointer, symbol, ident);
       put_string("*");
       break;
-    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Procedure:
       {
-        AstExprTypeProc *Proc = &Type->as.Proc;
+        AstExprTypeProcedure *Procedure = &Type->as.Procedure;
 
         should_print_symbol_name = false;
 
-        transpile_to_c_type_with_symbol(Proc->return_type, NULL, ident);
+        transpile_to_c_type_with_symbol(Procedure->return_type, NULL, ident);
         put_string(" (*");
         if (symbol)
           printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
         put_string(")");
-        transpile_to_c_type_proc_params(Proc, ident);
+        transpile_to_c_type_procedure_params(Procedure, ident);
       }
 
       break;
@@ -438,13 +438,14 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
     case Ast_Symbol_Procedure:
       {
         AstSymbolProcedure *Procedure = &symbol->as.Procedure;
-        AstExprTypeProc *Proc = &Procedure->type->as.Type.as.Proc;
-        assert(Procedure->type->tag == Ast_Expr_Type && Procedure->type->as.Type.tag == Ast_Expr_Type_Proc);
+
+        AstExprTypeProcedure *Type_Procedure = &Procedure->type->as.Type.as.Procedure;
+        assert(Procedure->type->tag == Ast_Expr_Type && Procedure->type->as.Type.tag == Ast_Expr_Type_Procedure);
 
         put_spaces(ident);
-        transpile_to_c_type(Proc->return_type, ident);
+        transpile_to_c_type(Type_Procedure->return_type, ident);
         printf(" " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
-        transpile_to_c_type_proc_params(Proc, ident);
+        transpile_to_c_type_procedure_params(Type_Procedure, ident);
         put_string("\n");
         transpile_to_c_stmt_block(&Procedure->block, ident);
         put_string("\n");

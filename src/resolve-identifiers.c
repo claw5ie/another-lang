@@ -87,7 +87,7 @@ resolve_identifiers_expr_list(Ast *ast, LinkedList *list)
 }
 
 void
-resolve_identifiers_type_proc(Ast *ast, AstExprTypeProc *type)
+resolve_identifiers_type_procedure(Ast *ast, AstExprTypeProcedure *type)
 {
   for (LinkedListNode *node = type->params.first; node; node = node->next)
     {
@@ -129,11 +129,11 @@ resolve_identifiers_type(Ast *ast, AstExpr **expr_ptr)
     case Ast_Expr_Type_Pointer:
       resolve_identifiers_expr(ast, &Type->as.Pointer);
       break;
-    case Ast_Expr_Type_Proc:
+    case Ast_Expr_Type_Procedure:
       {
-        AstExprTypeProc *Proc = &Type->as.Proc;
+        AstExprTypeProcedure *Procedure = &Type->as.Procedure;
 
-        resolve_identifiers_type_proc(ast, Proc);
+        resolve_identifiers_type_procedure(ast, Procedure);
       }
 
       break;
@@ -370,7 +370,7 @@ resolve_identifiers_symbol(Ast *ast, AstSymbol *symbol)
       {
         AstSymbolProcedure *Procedure = &symbol->as.Procedure;
 
-        resolve_identifiers_type_proc(ast, &Procedure->type->as.Type.as.Proc);
+        resolve_identifiers_type_procedure(ast, &Procedure->type->as.Type.as.Procedure);
         resolve_identifiers_stmt_block(ast, &Procedure->block);
       }
 
