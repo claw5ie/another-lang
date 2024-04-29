@@ -5,13 +5,12 @@
 //       forward declare functions.
 
 #define TAB_SIZE 2
-#define SYMBOL_NAME_SPECIFIER "%.*s_0x%x"
-#define FORMAT_SYMBOL_NAME(symbol) FORMAT_STRING_VIEW((symbol)->name), (symbol)->id
 
 #define put_string(string) fputs(string, stdout)
 
 void transpile_to_c_expr(AstExpr *, size_t);
 void transpile_to_c_type(AstExpr *, size_t);
+void transpile_to_c_type_with_symbol(AstExpr *, AstSymbol *, size_t);
 void transpile_to_c_stmt_block_no_curly(AstStmtBlock *, size_t);
 void transpile_to_c_stmt_block(AstStmtBlock *, size_t);
 
@@ -47,7 +46,7 @@ transpile_to_c_type_procedure_params(AstExprTypeProcedure *procedure, size_t ide
       AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);
       AstSymbolParameter *Parameter = &symbol->as.Parameter;
 
-      transpile_to_c_expr(Parameter->type, ident);
+      transpile_to_c_type(Parameter->type, ident);
       if (Parameter->has_name)
         printf(" " SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
 
@@ -68,7 +67,7 @@ transpile_to_c_struct_fields(LinkedList *fields, size_t ident)
       AstSymbolField *Field = &symbol->as.Struct_Or_Union_Field;
 
       put_spaces(ident + TAB_SIZE);
-      transpile_to_c_expr(Field->type, ident);
+      transpile_to_c_type(Field->type, ident);
       printf(" " SYMBOL_NAME_SPECIFIER ";\n", FORMAT_SYMBOL_NAME(symbol));
     }
   put_spaces(ident);
@@ -282,6 +281,17 @@ transpile_to_c_expr(AstExpr *expr, size_t ident)
 }
 
 void
+transpile_to_c_type_procedure(AstExprTypeProcedure *type, AstSymbol *symbol, size_t ident)
+{
+  transpile_to_c_type_with_symbol(type->return_type, NULL, ident);
+  put_string(" (*");
+  if (symbol)
+    printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
+  put_string(")");
+  transpile_to_c_type_procedure_params(type, ident);
+}
+
+void
 transpile_to_c_type_array(AstExpr *type, AstSymbol *symbol, size_t ident)
 {
   switch (type->as.Type.tag)
@@ -336,16 +346,15 @@ transpile_to_c_type_with_symbol(AstExpr *type, AstSymbol *symbol, size_t ident)
       break;
     case Ast_Expr_Type_Procedure:
       {
-        AstExprTypeProcedure *Procedure = &Type->as.Procedure;
+        if (Type->symbol)
+          printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Type->symbol));
+        else
+          {
+            AstExprTypeProcedure *Procedure = &Type->as.Procedure;
 
-        should_print_symbol_name = false;
-
-        transpile_to_c_type_with_symbol(Procedure->return_type, NULL, ident);
-        put_string(" (*");
-        if (symbol)
-          printf(SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
-        put_string(")");
-        transpile_to_c_type_procedure_params(Procedure, ident);
+            should_print_symbol_name = false;
+            transpile_to_c_type_procedure(Procedure, symbol, ident);
+          }
       }
 
       break;
@@ -472,6 +481,16 @@ transpile_to_c_symbol(AstSymbol *symbol, size_t ident)
 
             switch (Expr_Type->tag)
               {
+              case Ast_Expr_Type_Procedure:
+                {
+                  AstExprTypeProcedure *Procedure = &Expr_Type->as.Procedure;
+
+                  put_string("typedef ");
+                  transpile_to_c_type_procedure(Procedure, symbol, ident);
+                  put_string(";\n");
+                }
+
+                break;
               case Ast_Expr_Type_Struct:
                 {
                   AstExprTypeStruct *Struct = &Expr_Type->as.Struct_Or_Union;

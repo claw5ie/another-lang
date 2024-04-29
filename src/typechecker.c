@@ -10,6 +10,9 @@ typedef u16 TypeFlagsType;
 #define is_pointer_to_void(flags) (((flags) & TYPE_POINTS_TO_VOID) == TYPE_POINTS_TO_VOID)
 #define is_pointer_to_non_void(flags) (((flags) & TYPE_POINTS_TO_VOID) == TYPE_IS_POINTER)
 
+#define SYMBOL_NAME_SPECIFIER "%.*s_0x%x"
+#define FORMAT_SYMBOL_NAME(symbol) FORMAT_STRING_VIEW((symbol)->name), (symbol)->id
+
 AstExpr g_void_type = {
   .tag = Ast_Expr_Type,
   .as = { .Type = {
@@ -489,7 +492,7 @@ eprint_expr(AstExpr *expr)
         AstExprFieldAccess *Field_Access = &expr->as.Field_Access;
 
         eprint_expr(Field_Access->lhs);
-        fprintf(stderr, ".%.*s", FORMAT_STRING_VIEW(Field_Access->symbol->name));
+        fprintf(stderr, SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Field_Access->symbol));
       }
 
       break;
@@ -518,7 +521,7 @@ eprint_expr(AstExpr *expr)
       {
         AstExprDesignator *Designator = &expr->as.Designator;
 
-        fprintf(stderr, "%.*s = ", FORMAT_STRING_VIEW(Designator->symbol->name));
+        fprintf(stderr, SYMBOL_NAME_SPECIFIER " = ", FORMAT_SYMBOL_NAME(Designator->symbol));
         eprint_expr(Designator->expr);
       }
 
@@ -530,7 +533,7 @@ eprint_expr(AstExpr *expr)
       {
         AstSymbol *symbol = expr->as.Symbol;
 
-        fprintf(stderr, "%.*s", FORMAT_STRING_VIEW(symbol->name));
+        fprintf(stderr, SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(symbol));
       }
 
       break;
@@ -551,7 +554,7 @@ eprint_type(AstExpr *type)
 
   if (Type->symbol)
     {
-      fprintf(stderr, "%.*s", FORMAT_STRING_VIEW(Type->symbol->name));
+      fprintf(stderr, SYMBOL_NAME_SPECIFIER, FORMAT_SYMBOL_NAME(Type->symbol));
       return;
     }
 
@@ -582,7 +585,7 @@ eprint_type(AstExpr *type)
       {
         AstExprTypeProcedure *Procedure = &Type->as.Procedure;
 
-        fputs("procedure(", stderr);
+        fputs("proc(", stderr);
         for (LinkedListNode *node = Procedure->params.first; node; node = node->next)
           {
             AstSymbol *symbol = LINKED_LIST_GET_NODE_DATA(AstSymbol *, node);

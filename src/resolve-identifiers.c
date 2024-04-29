@@ -307,10 +307,20 @@ resolve_identifiers_expr(Ast *ast, AstExpr **expr_ptr)
             *expr_ptr = symbol->as.Type;
             break;
           case Ast_Symbol_Alias:
-            resolve_identifiers_symbol(ast, symbol);
+            // Don't report cyclic reference error if alias definition references itself.
+            if (symbol->resolving_stage == Ast_Symbol_Flag_Not_Resolved)
+              {
+                resolve_identifiers_symbol(ast, symbol);
+                assert(symbol->tag == Ast_Symbol_Type);
+                *expr_ptr = symbol->as.Type;
+              }
+            else
+              {
+                // Only alias can reference itself???
+                assert(symbol->tag == Ast_Symbol_Alias);
+                *expr_ptr = symbol->as.Alias;
+              }
 
-            assert(symbol->tag == Ast_Symbol_Type);
-            *expr_ptr = symbol->as.Type;
             break;
           default:
             expr->tag = Ast_Expr_Symbol;
