@@ -3,6 +3,8 @@
 //       add strings.
 //       typedef/shuffle recursive types.
 //       forward declare functions.
+//       precompute enum values (or #define them???)
+//       add typedef for each function type ('cause can't have inline fields with function type, for example).
 
 #define TAB_SIZE 2
 
