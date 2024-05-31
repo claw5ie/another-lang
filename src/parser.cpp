@@ -123,6 +123,8 @@ struct Parser
       };
       expr_list.insert_last(node);
     }
+
+    ast.exprs = expr_list;
   }
 
   void report_error(LineInfo line_info, std::string_view text)
