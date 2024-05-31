@@ -1,3 +1,11 @@
+#ifdef NDEBUG
+#define COMPILER_EXIT_ERROR() exit(EXIT_FAILURE)
+#else
+#define COMPILER_EXIT_ERROR() assert(false)
+#endif
+
+#define REPORT_ERROR_HELPER(filepath, line_info, header, text) std::cout << filepath << ":" << (line_info).line << ":" << (line_info).column << ": " header ": " << text << "\n"
+
 struct Lexer
 {
   struct LineInfo
@@ -151,6 +159,7 @@ struct Lexer
       }
 
       report_error(line_info, std::format("unexpected character '{}'", text[i]));
+      COMPILER_EXIT_ERROR();
     }
 
   push_token:
@@ -162,7 +171,7 @@ struct Lexer
 
   void report_error(LineInfo line_info, std::string_view text)
   {
-    std::cout << filepath << ":" << line_info.line << ":" << line_info.column << ": error: " << text << "\n";
+    REPORT_ERROR_HELPER(filepath, line_info, "error", text);
   }
 
   Token token_buffer[LOOKAHEAD] = { };

@@ -1,6 +1,15 @@
+#define UNREACHABLE() assert(false && "unreachable")
+
 namespace Utils
 {
-  bool is_prefix(std::string_view prefix, std::string_view string)
+  constexpr size_t align_by_void_pointer(size_t value)
+  {
+    value += sizeof(void *) - 1;
+    value -= value % sizeof(void *);
+    return value;
+  }
+
+  constexpr bool is_prefix(std::string_view prefix, std::string_view string)
   {
     return prefix.size() <= string.size() && memcmp(&prefix[0], &string[0], prefix.size()) == 0;
   }

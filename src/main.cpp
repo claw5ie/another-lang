@@ -21,47 +21,12 @@ using i32 = int32_t;
 using i64 = int64_t;
 
 #include "utils.cpp"
+#include "notstd.cpp"
 #include "lexer.cpp"
+#include "ast.cpp"
+#include "parser.cpp"
 
 int main(int argc, char **argv)
 {
-  using Token = Lexer::Token;
-
-  auto lexer = Lexer::init(argc < 2 ? "examples/debug" : argv[1]);
-
-  do
-  {
-    auto token = lexer.grab();
-    lexer.advance();
-
-    std::cout << "text: \"";
-
-    switch (token.tag)
-    {
-    case Token::_Plus:
-      std::cout << "+";
-      break;
-    case Token::_Minus:
-      std::cout << "-";
-      break;
-    case Token::_Asterisk:
-      std::cout << "*";
-      break;
-    case Token::_Slash:
-      std::cout << "/";
-      break;
-    case Token::_Integer:
-      std::cout << token.as.Integer;
-      break;
-    case Token::_End_Of_File:
-      break;
-    }
-
-    std::cout << "\""
-              << "\nline: (" << token.line_info.line << ", " << token.line_info.column << ", " << token.line_info.offset << ")\n";
-
-    if (token.tag == Token::_End_Of_File)
-      break;
-  }
-  while (true);
+  Parser::parse(argc < 2 ? "examples/debug" : argv[1]);
 }
