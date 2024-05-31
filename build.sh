@@ -1,3 +1,3 @@
 #!/bin/bash
 set -xeu
-gcc -Wall -Wextra -pedantic -g src/main.c $@
+g++ -Wall -Wextra -pedantic -g src/main.cpp $@
