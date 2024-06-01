@@ -7,11 +7,13 @@ struct Parser
 
   static Ast parse(const char *filepath)
   {
+    auto lexer = Lexer::init(filepath);
     auto parser = Parser{
-      .lexer = Lexer::init(filepath),
+      .lexer = lexer,
       .ast = {
         .exprs = { },
         .arena = { },
+        .filepath = lexer.filepath,
       }
     };
     parser.parse();
@@ -23,11 +25,20 @@ struct Parser
   {
     switch (op)
     {
+    case Token::_Double_Bar:       return -4;
+    case Token::_Double_Ampersand: return -3;
+    case Token::_Equal:
+    case Token::_Not_Equal:        return -2;
+    case Token::_Less:
+    case Token::_Less_Equal:
+    case Token::_Greater:
+    case Token::_Greater_Equal:    return -1;
     case Token::_Plus:
-    case Token::_Minus:    return 0;
+    case Token::_Minus:            return 0;
     case Token::_Asterisk:
-    case Token::_Slash:    return 1;
-    default:               return LOWEST_PREC - 1;
+    case Token::_Slash:
+    case Token::_Percent_Sign:     return 1;
+    default:                       return LOWEST_PREC - 1;
     }
   }
 
@@ -35,11 +46,31 @@ struct Parser
   {
     switch (op)
     {
-    case Token::_Plus:     return Ast::Expr::BinaryOp::Add;
-    case Token::_Minus:    return Ast::Expr::BinaryOp::Sub;
-    case Token::_Asterisk: return Ast::Expr::BinaryOp::Mul;
-    case Token::_Slash:    return Ast::Expr::BinaryOp::Div;
-    default:               UNREACHABLE();
+    case Token::_Double_Bar:       return Ast::Expr::BinaryOp::Or;
+    case Token::_Double_Ampersand: return Ast::Expr::BinaryOp::And;
+    case Token::_Equal:            return Ast::Expr::BinaryOp::Eq;
+    case Token::_Not_Equal:        return Ast::Expr::BinaryOp::Neq;
+    case Token::_Less:             return Ast::Expr::BinaryOp::Lt;
+    case Token::_Less_Equal:       return Ast::Expr::BinaryOp::Leq;
+    case Token::_Greater:          return Ast::Expr::BinaryOp::Gt;
+    case Token::_Greater_Equal:    return Ast::Expr::BinaryOp::Geq;
+    case Token::_Plus:             return Ast::Expr::BinaryOp::Add;
+    case Token::_Minus:            return Ast::Expr::BinaryOp::Sub;
+    case Token::_Asterisk:         return Ast::Expr::BinaryOp::Mul;
+    case Token::_Slash:            return Ast::Expr::BinaryOp::Div;
+    case Token::_Percent_Sign:     return Ast::Expr::BinaryOp::Mod;
+    default:                       UNREACHABLE();
+    }
+  }
+
+  static Ast::Expr::UnaryOp::Tag to_unary_op_tag(Token::Tag op)
+  {
+    switch (op)
+    {
+    case Token::_Plus:             return Ast::Expr::UnaryOp::Plus;
+    case Token::_Minus:            return Ast::Expr::UnaryOp::Minus;
+    case Token::_Exclamation_Mark: return Ast::Expr::UnaryOp::Not;
+    default:                       UNREACHABLE();
     }
   }
 
@@ -50,6 +81,40 @@ struct Parser
 
     switch (token.tag)
     {
+    case Token::_Plus:
+    case Token::_Minus:
+    case Token::_Exclamation_Mark:
+    {
+      auto subexpr = parse_expr_highest_prec();
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Unary_Op,
+        .as = { .Unary_Op = {
+            .tag = to_unary_op_tag(token.tag),
+            .subexpr = subexpr,
+          } },
+      };
+
+      return expr;
+    }
+    case Token::_Open_Paren:
+    {
+      auto expr = parse_expr();
+      lexer.expect(Token::_Close_Paren);
+      return expr;
+    }
+    case Token::_False:
+    case Token::_True:
+    {
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Boolean,
+        .as = { .Boolean = token.tag == Token::_True },
+      };
+      return expr;
+    }
     case Token::_Integer:
     {
       auto expr = ast.alloc<Ast::Expr>();
@@ -59,6 +124,16 @@ struct Parser
         .as = { .Integer = token.as.Integer },
       };
 
+      return expr;
+    }
+    case Token::_Identifier:
+    {
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Identifier,
+        .as = { .Identifier = token.as.Identifier },
+      };
       return expr;
     }
     default:

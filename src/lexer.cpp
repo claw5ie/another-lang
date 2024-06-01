@@ -18,12 +18,30 @@ struct Lexer
   {
     enum Tag
     {
+      _Double_Bar,
+      _Double_Ampersand,
+      _Equal,
+      _Not_Equal,
+      _Less,
+      _Less_Equal,
+      _Greater,
+      _Greater_Equal,
       _Plus,
       _Minus,
       _Asterisk,
       _Slash,
+      _Percent_Sign,
+
+      _Exclamation_Mark,
+
+      _Open_Paren,
+      _Close_Paren,
+
+      _False,
+      _True,
 
       _Integer,
+      _Identifier,
 
       _End_Of_File,
     };
@@ -31,6 +49,7 @@ struct Lexer
     union Data
     {
       u64 Integer;
+      std::string_view Identifier;
     };
 
     Tag tag;
@@ -86,6 +105,47 @@ struct Lexer
     }
   }
 
+  void expect(Token::Tag expected)
+  {
+    static constexpr auto to_string = [](Token::Tag tag) -> std::string_view
+    {
+      switch (tag)
+      {
+      case Token::_Double_Bar:       return "'||'";
+      case Token::_Double_Ampersand: return "'&&'";
+      case Token::_Equal:            return "'=='";
+      case Token::_Not_Equal:        return "'!='";
+      case Token::_Less:             return "'<'";
+      case Token::_Less_Equal:       return "'<='";
+      case Token::_Greater:          return "'>'";
+      case Token::_Greater_Equal:    return "'>='";
+      case Token::_Plus:             return "'+'";
+      case Token::_Minus:            return "'-'";
+      case Token::_Asterisk:         return "'*'";
+      case Token::_Slash:            return "'/'";
+      case Token::_Percent_Sign:     return "'%'";
+      case Token::_Exclamation_Mark: return "'!'";
+      case Token::_Open_Paren:       return "'('";
+      case Token::_Close_Paren:      return "')'";
+      case Token::_False:            return "'false'";
+      case Token::_True:             return "'true'";
+      case Token::_Integer:          return "integer literal";
+      case Token::_Identifier:       return "identifier";
+      case Token::_End_Of_File:      return "end-of-file";
+      }
+
+      UNREACHABLE();
+    };
+
+    if (peek() != expected)
+    {
+      report_error(grab().line_info, std::format("expected {}", to_string(expected)));
+      COMPILER_EXIT_ERROR();
+
+    }
+    advance();
+  }
+
   void buffer_token()
   {
     auto text = std::string_view{ source_code };
@@ -126,6 +186,40 @@ struct Lexer
       token.tag = Token::_Integer;
       token.as = { .Integer = value };
     }
+    else if (isalpha(text[i]) || text[i] == '_')
+    {
+      do
+      {
+        advance_line_info();
+        ++i;
+      }
+      while (isalnum(text[i]) || text[i] == '_');
+
+      auto text = std::string_view{ &source_code[token.line_info.offset], i - token.line_info.offset };
+
+      token.tag = Token::_Identifier;
+      token.as = { .Identifier = text };
+
+      struct Keyword
+      {
+        std::string_view text;
+        Token::Tag tag;
+      };
+
+      static constexpr Keyword keywords[] = {
+        { .text = "false", .tag = Token::_False, },
+        { .text = "true", .tag = Token::_True, },
+      };
+
+      for (auto &keyword: keywords)
+      {
+        if (keyword.text == text)
+        {
+          token.tag = keyword.tag;
+          break;
+        }
+      }
+    }
     else
     {
       struct Symbol
@@ -135,10 +229,22 @@ struct Lexer
       };
 
       static constexpr Symbol symbols[] = {
+        { .text = "||", .tag = Token::_Double_Bar, },
+        { .text = "&&", .tag = Token::_Double_Ampersand, },
+        { .text = "==", .tag = Token::_Equal, },
+        { .text = "!=", .tag = Token::_Not_Equal, },
+        { .text = "<=", .tag = Token::_Less_Equal, },
+        { .text = ">=", .tag = Token::_Greater_Equal, },
+        { .text = "<", .tag = Token::_Less, },
+        { .text = ">", .tag = Token::_Greater, },
         { .text = "+", .tag = Token::_Plus, },
         { .text = "-", .tag = Token::_Minus, },
         { .text = "*", .tag = Token::_Asterisk, },
         { .text = "/", .tag = Token::_Slash, },
+        { .text = "%", .tag = Token::_Percent_Sign, },
+        { .text = "!", .tag = Token::_Exclamation_Mark, },
+        { .text = "(", .tag = Token::_Open_Paren, },
+        { .text = ")", .tag = Token::_Close_Paren, },
       };
 
       auto rest = std::string_view{ &text[i], source_code.size() - i };

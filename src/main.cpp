@@ -25,10 +25,12 @@ using i64 = int64_t;
 #include "lexer.cpp"
 #include "ast.cpp"
 #include "parser.cpp"
+#include "typechecker.cpp"
 #include "transpiler.cpp"
 
 int main(int argc, char **argv)
 {
   auto ast = Parser::parse(argc < 2 ? "examples/debug" : argv[1]);
+  Typechecker::typecheck(ast);
   Transpiler::transpile(ast);
 }
