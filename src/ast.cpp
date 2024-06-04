@@ -91,6 +91,7 @@ struct Ast
 
       Tag tag;
       Expr *lhs, *rhs;
+      LineInfo line_info;
     };
 
     struct UnaryOp

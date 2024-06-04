@@ -199,12 +199,13 @@ struct Parser
         auto rhs = parse_expr_prec(curr_prec + 1);
         auto new_lhs = ast.alloc<Ast::Expr>();
         *new_lhs = {
-          .line_info = line_info,
+          .line_info = lhs->line_info,
           .tag = Ast::Expr::_Binary_Op,
           .as = { .Binary_Op = {
               .tag = to_binary_op_tag(op),
               .lhs = lhs,
               .rhs = rhs,
+              .line_info = line_info,
             } },
           .flags = 0,
         };

@@ -217,7 +217,7 @@ struct Typechecker
       {
         if (!is_same_type(lhs_type, &bool_type) || !is_same_type(rhs_type, &bool_type))
         {
-          report_error(expr->line_info, std::format("expected 'bool'/'bool', but got '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
+          report_error(Binary_Op.line_info, std::format("expected 'bool'/'bool', but got '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
         }
 
         return &bool_type;
@@ -227,7 +227,7 @@ struct Typechecker
       {
         if (!is_same_type(Binary_Op.lhs, lhs_type, Binary_Op.rhs, rhs_type))
         {
-          report_error(expr->line_info, std::format("can't compare values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
+          report_error(Binary_Op.line_info, std::format("can't compare values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
         }
 
         return &bool_type;
@@ -239,7 +239,7 @@ struct Typechecker
       {
         if (!maybe_safe_cast_int_types(Binary_Op.lhs, lhs_type, Binary_Op.rhs, rhs_type))
         {
-          report_error(expr->line_info, std::format("can't compare values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
+          report_error(Binary_Op.line_info, std::format("can't compare values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
         }
 
         return &bool_type;
@@ -254,7 +254,7 @@ struct Typechecker
 
         if (!result)
         {
-          report_error(expr->line_info, std::format("can't perform arithmetic operation on values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
+          report_error(Binary_Op.line_info, std::format("can't perform arithmetic operation on values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
         }
 
         return result;
@@ -385,7 +385,7 @@ struct Typechecker
     switch (pattern->tag)
     {
     case Ast::Expr::_Binary_Op:
-      report_error(pattern->line_info, "can't pattern match binary operators");
+      report_error(pattern->as.Binary_Op.line_info, "can't pattern match binary operators");
       break;
     case Ast::Expr::_Unary_Op:
       report_error(pattern->line_info, "can't pattern match unary operators");
@@ -462,7 +462,7 @@ struct Typechecker
 
       if (!(Assign.lhs->flags & Ast::Expr::IS_LVALUE))
       {
-        report_error(Assign.lhs->line_info, "expected lvalue");
+        report_error(Assign.lhs->line_info, "expression is not a lvalue");
       }
 
       auto rhs_type = typecheck_expr(Assign.rhs);
