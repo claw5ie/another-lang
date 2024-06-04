@@ -487,7 +487,7 @@ struct Typechecker
       typecheck_stmt(node->data);
 
     if (had_error)
-      COMPILER_EXIT_ERROR();
+      exit(EXIT_FAILURE);
   }
 
   void report_error(LineInfo line_info, std::string_view text)

@@ -16,7 +16,8 @@ struct Parser
         .arena = { },
         .filepath = lexer.filepath,
         .source_code = { },
-      }
+      },
+      .had_error = false,
     };
     parser.parse();
 
@@ -410,13 +411,18 @@ struct Parser
     }
 
     ast.stmt_list = stmt_list;
+
+    if (had_error)
+      exit(EXIT_FAILURE);
   }
 
   void report_error(LineInfo line_info, std::string_view text)
   {
+    had_error = true;
     REPORT_ERROR_HELPER(lexer.filepath, line_info, "error", text);
   }
 
   Lexer lexer;
   Ast ast;
+  bool had_error;
 };
