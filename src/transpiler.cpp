@@ -8,6 +8,41 @@ struct Transpiler
     transpiler.transpile();
   }
 
+  static constexpr u16 round_to_next_power_of_two(u16 bits)
+  {
+    if (bits <= 8)
+      return 8;
+
+    bits--;
+    bits |= bits >> 1;
+    bits |= bits >> 2;
+    bits |= bits >> 4;
+    bits |= bits >> 8;
+    bits++;
+
+    return bits;
+  }
+
+  void transpile_type(Ast::Expr *type)
+  {
+    assert(type->tag == Ast::Expr::_Type);
+
+    auto &Type = type->as.Type;
+
+    switch (Type.tag)
+    {
+    case Ast::Type::_Bool:
+      std::cout << "bool";
+      break;
+    case Ast::Type::_Int:
+    {
+      auto &Int = Type.as.Int;
+
+      std::cout << (Int.is_signed ? 'i' : 'u') << round_to_next_power_of_two(Int.bits);
+    } break;
+    }
+  }
+
   void transpile_expr(Ast::Expr *expr)
   {
     switch (expr->tag)
@@ -51,6 +86,15 @@ struct Transpiler
       transpile_expr(Unary_Op.subexpr);
       std::cout << ")";
     } break;
+    case Ast::Expr::_Cast:
+    {
+      auto &Cast = expr->as.Cast;
+
+      std::cout << "(";
+      transpile_type(Cast.type);
+      std::cout << ")";
+      transpile_expr(Cast.expr);
+    } break;
     case Ast::Expr::_Type:
     {
       auto &Type = expr->as.Type;
@@ -77,22 +121,136 @@ struct Transpiler
     {
       std::cout << expr->as.Integer;
     } break;
-    case Ast::Expr::_Identifier:
+    case Ast::Expr::_Symbol:
     {
-      std::cout << expr->as.Identifier;
+      auto Symbol = expr->as.Symbol;
+
+      std::cout << Symbol->name;
     } break;
+    case Ast::Expr::_Identifier:
+      UNREACHABLE();
+    }
+  }
+
+  void transpile_pattern_match(Ast::Expr *pattern, Ast::Expr *value)
+  {
+    switch (pattern->tag)
+    {
+    case Ast::Expr::_Boolean:
+    {
+      std::cout << "assert(" << pattern->as.Boolean << " == ";
+      transpile_expr(value);
+      std::cout << ");\n";
+    } break;
+    case Ast::Expr::_Integer:
+    {
+      std::cout << "assert(" << pattern->as.Integer << " == ";
+      transpile_expr(value);
+      std::cout << ");\n";
+    } break;
+    case Ast::Expr::_Symbol:
+    {
+      auto Symbol = pattern->as.Symbol;
+      assert(Symbol->tag == Ast::Symbol::_Identifier);
+      auto &Identifier = Symbol->as.Identifier;
+      Identifier.value = value;
+      transpile_symbol(Symbol);
+    } break;
+    case Ast::Expr::_Binary_Op:
+    case Ast::Expr::_Unary_Op:
+    case Ast::Expr::_Cast:
+    case Ast::Expr::_Type:
+    case Ast::Expr::_Identifier:
+      UNREACHABLE();
+    }
+  }
+
+  void transpile_symbol(Ast::Symbol *symbol)
+  {
+    switch (symbol->tag)
+    {
+    case Ast::Symbol::_Identifier:
+    {
+      auto &Identifier = symbol->as.Identifier;
+
+      transpile_type(Identifier.type);
+      std::cout << " " << symbol->name;
+      if (Identifier.value)
+      {
+        std::cout << " = ";
+        transpile_expr(Identifier.value);
+      }
+      std::cout << ";";
+    } break;
+    case Ast::Symbol::_Variable:
+    {
+      auto &Variable = symbol->as.Variable;
+
+      transpile_pattern_match(Variable.pattern, Variable.value);
+    } break;
+    }
+  }
+
+  void transpile_stmt(Ast::Stmt *stmt)
+  {
+    switch (stmt->tag)
+    {
+    case Ast::Stmt::_Assign:
+    {
+      auto &Assign = stmt->as.Assign;
+
+      transpile_expr(Assign.lhs);
+      std::cout << " = ";
+      transpile_expr(Assign.rhs);
+      std::cout << ";";
+    } break;
+    case Ast::Stmt::_Symbol:
+      transpile_symbol(stmt->as.Symbol);
+      break;
+    case Ast::Stmt::_Expr:
+      transpile_expr(stmt->as.Expr);
+      std::cout << ";";
+      break;
     }
   }
 
   void transpile()
   {
-    std::cout << "int main(void)\n{\n";
+    std::cout <<
+      "#include <stdio.h>\n"
+      "#include <stdlib.h>\n"
+      "#include <ctype.h>\n"
+      "#include <string.h>\n"
+      "#include <stdbool.h>\n"
+      "#include <stdint.h>\n"
+      "#include <limits.h>\n"
+      "#include <stddef.h>\n"
+      "#include <stdarg.h>\n"
+      "#include <math.h>\n"
+      "#include <assert.h>\n"
+      "\n"
+      "#include <errno.h>\n"
+      "#include <fcntl.h>\n"
+      "#include <unistd.h>\n"
+      "#include <sys/stat.h>\n"
+      "\n"
+      "typedef uint8_t  u8;\n"
+      "typedef uint16_t u16;\n"
+      "typedef uint32_t u32;\n"
+      "typedef uint64_t u64;\n"
+      "\n"
+      "typedef int8_t  i8;\n"
+      "typedef int16_t i16;\n"
+      "typedef int32_t i32;\n"
+      "typedef int64_t i64;\n"
+      "\n"
+      "int main(void)\n{\n";
 
-    for (auto node = ast->exprs.first; node; node = node->next)
+    for (auto node = ast->stmt_list.first; node; node = node->next)
     {
       std::cout << "  ";
-      transpile_expr(node->data);
-      std::cout << ";\n";
+      transpile_stmt(node->data);
+      std::cout << "\n";
     }
 
     std::cout << "}\n";

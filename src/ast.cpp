@@ -1,10 +1,49 @@
 struct Ast
 {
+  struct Symbol;
   struct Expr;
+  struct Stmt;
 
   using ArenaAllocator = NotStd::ArenaAllocator;
   using LineInfo = Lexer::LineInfo;
+  using SymbolList = NotStd::LinkedList<Symbol *>;
   using ExprList = NotStd::LinkedList<Expr *>;
+  using StmtList = NotStd::LinkedList<Stmt *>;
+
+  struct SymbolKey
+  {
+    std::string_view name;
+  };
+
+  struct Symbol
+  {
+    struct Identifier
+    {
+      Expr *type, *value;
+    };
+
+    struct Variable
+    {
+      Expr *pattern, *type, *value;
+    };
+
+    enum Tag
+    {
+      _Identifier,
+      _Variable,
+    };
+
+    union Data
+    {
+      Symbol::Identifier Identifier;
+      Symbol::Variable Variable;
+    };
+
+    std::string_view name;
+    LineInfo line_info;
+    Tag tag;
+    Data as;
+  };
 
   struct Type
   {
@@ -67,13 +106,20 @@ struct Ast
       Expr *subexpr;
     };
 
+    struct Cast
+    {
+      Expr *type, *expr;
+    };
+
     enum Tag
     {
       _Binary_Op,
       _Unary_Op,
+      _Cast,
       _Type,
       _Boolean,
       _Integer,
+      _Symbol,
       _Identifier,
     };
 
@@ -81,22 +127,17 @@ struct Ast
     {
       Expr::BinaryOp Binary_Op;
       Expr::UnaryOp Unary_Op;
+      Expr::Cast Cast;
       Ast::Type Type;
       bool Boolean;
       u64 Integer;
+      Ast::Symbol *Symbol;
       std::string_view Identifier;
     };
 
-    LineInfo line_info;
-    Tag tag;
-    Data as;
-
-    bool is_same_type(Ast::Expr *other)
-    {
-      assert(this->tag == Ast::Expr::_Type
-             && other->tag == Ast::Expr::_Type);
-      return this->as.Type.tag == other->as.Type.tag;
-    }
+    using Flag = u8;
+    static constexpr Flag IS_LVALUE = 0x1;
+    static constexpr Flag TYPE_HAS_ZERO_BITS = 0x2;
 
     std::string type_to_string()
     {
@@ -123,6 +164,78 @@ struct Ast
       go(this, result);
       return result;
     }
+
+    LineInfo line_info;
+    Tag tag;
+    Data as;
+    Flag flags;
+  };
+
+  struct Stmt
+  {
+    struct Assign
+    {
+      Expr *lhs, *rhs;
+    };
+
+    enum Tag
+    {
+      _Assign,
+      _Symbol,
+      _Expr,
+    };
+
+    union Data
+    {
+      Stmt::Assign Assign;
+      Ast::Symbol *Symbol;
+      Ast::Expr *Expr;
+    };
+
+    LineInfo line_info;
+    Tag tag;
+    Data as;
+  };
+
+  struct SymbolTable
+  {
+    struct Hash
+    {
+      size_t operator()(SymbolKey key) const
+      {
+        auto hasher = std::hash<std::string_view>{};
+        auto hash = hasher(key.name);
+        return hash;
+      }
+    };
+
+    struct Equal
+    {
+      bool operator()(SymbolKey key0, SymbolKey key1) const
+      {
+        return key0.name == key1.name;
+      }
+    };
+
+    using Map = std::unordered_map<SymbolKey, Symbol *, Hash, Equal>;
+    using StringList = std::forward_list<std::string>;
+
+    std::pair<Map::iterator, bool> insert(SymbolKey key)
+    {
+      auto it = map.find(key);
+      if (it != map.end())
+        return { it, false };
+      else
+      {
+        strings.push_front(std::string{ key.name });
+        auto [it, was_inserted] = map.emplace(SymbolKey{ .name = strings.front() }, nullptr);
+        assert(was_inserted);
+        return { it, true };
+      }
+    }
+
+    Map map;
+    StringList strings;
   };
 
   template <typename T>
@@ -134,7 +247,10 @@ struct Ast
     return data;
   }
 
-  ExprList exprs;
+  StmtList stmt_list;
+  SymbolTable symbol_table;
   ArenaAllocator arena;
+
   std::string_view filepath;
+  std::string source_code;
 };

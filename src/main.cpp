@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 #include <format>
+#include <forward_list>
+#include <unordered_map>
 
 #include <cstring>
 #include <cstdint>

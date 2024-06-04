@@ -11,14 +11,18 @@ struct Parser
     auto parser = Parser{
       .lexer = lexer,
       .ast = {
-        .exprs = { },
+        .stmt_list = { },
+        .symbol_table = { },
         .arena = { },
         .filepath = lexer.filepath,
+        .source_code = { },
       }
     };
     parser.parse();
 
-    return parser.ast;
+    parser.ast.source_code = std::move(parser.lexer.source_code);
+
+    return std::move(parser.ast);
   }
 
   static int prec(Token::Tag op)
@@ -27,7 +31,7 @@ struct Parser
     {
     case Token::_Double_Bar:       return -4;
     case Token::_Double_Ampersand: return -3;
-    case Token::_Equal:
+    case Token::_Double_Equal:
     case Token::_Not_Equal:        return -2;
     case Token::_Less:
     case Token::_Less_Equal:
@@ -48,7 +52,7 @@ struct Parser
     {
     case Token::_Double_Bar:       return Ast::Expr::BinaryOp::Or;
     case Token::_Double_Ampersand: return Ast::Expr::BinaryOp::And;
-    case Token::_Equal:            return Ast::Expr::BinaryOp::Eq;
+    case Token::_Double_Equal:     return Ast::Expr::BinaryOp::Eq;
     case Token::_Not_Equal:        return Ast::Expr::BinaryOp::Neq;
     case Token::_Less:             return Ast::Expr::BinaryOp::Lt;
     case Token::_Less_Equal:       return Ast::Expr::BinaryOp::Leq;
@@ -94,6 +98,7 @@ struct Parser
             .tag = to_unary_op_tag(token.tag),
             .subexpr = subexpr,
           } },
+        .flags = 0,
       };
 
       return expr;
@@ -104,6 +109,39 @@ struct Parser
       lexer.expect(Token::_Close_Paren);
       return expr;
     }
+    case Token::_Bool_Type:
+    {
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Type,
+        .as = { .Type = {
+            .tag = Ast::Type::_Bool,
+            .as = { },
+          } },
+        .flags = 0,
+      };
+      return expr;
+    }
+    case Token::_Int_Type:
+    {
+      auto &Int_Type = token.as.Int_Type;
+
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Type,
+        .as = { .Type = {
+            .tag = Ast::Type::_Int,
+            .as = { .Int = {
+                .bits = Int_Type.bits,
+                .is_signed = Int_Type.is_signed,
+              } },
+          } },
+        .flags = 0,
+      };
+      return expr;
+    }
     case Token::_False:
     case Token::_True:
     {
@@ -112,6 +150,7 @@ struct Parser
         .line_info = token.line_info,
         .tag = Ast::Expr::_Boolean,
         .as = { .Boolean = token.tag == Token::_True },
+        .flags = 0,
       };
       return expr;
     }
@@ -122,6 +161,7 @@ struct Parser
         .line_info = token.line_info,
         .tag = Ast::Expr::_Integer,
         .as = { .Integer = token.as.Integer },
+        .flags = 0,
       };
 
       return expr;
@@ -133,6 +173,7 @@ struct Parser
         .line_info = token.line_info,
         .tag = Ast::Expr::_Identifier,
         .as = { .Identifier = token.as.Identifier },
+        .flags = 0,
       };
       return expr;
     }
@@ -165,6 +206,7 @@ struct Parser
               .lhs = lhs,
               .rhs = rhs,
             } },
+          .flags = 0,
         };
         lhs = new_lhs;
 
@@ -184,22 +226,189 @@ struct Parser
     return parse_expr_prec(LOWEST_PREC);
   }
 
+  Ast::Stmt *parse_stmt()
+  {
+    auto must_end_with_semicolon = false;
+
+    const auto go = [this, &must_end_with_semicolon]() -> Ast::Stmt *
+    {
+      auto base = parse_expr();
+
+      switch (lexer.peek())
+      {
+      case Token::_Colon:
+      {
+        auto line_info = lexer.grab().line_info;
+
+        lexer.advance();
+        auto type = parse_expr();
+        Ast::Expr *value = nullptr;
+
+        if (lexer.peek() == Token::_Equal)
+        {
+          lexer.advance();
+          value = parse_expr();
+        }
+
+        insert_symbol(base);
+
+        auto symbol = ast.alloc<Ast::Symbol>();
+        *symbol = Ast::Symbol{
+          .name = { },
+          .line_info = line_info,
+          .tag = Ast::Symbol::_Variable,
+          .as = { .Variable = {
+              .pattern = base,
+              .type = type,
+              .value = value,
+            } },
+        };
+
+        auto stmt = ast.alloc<Ast::Stmt>();
+        *stmt = Ast::Stmt{
+          .line_info = base->line_info,
+          .tag = Ast::Stmt::_Symbol,
+          .as = { .Symbol = symbol },
+        };
+
+        must_end_with_semicolon = true;
+
+        return stmt;
+      }
+      case Token::_Equal:
+      {
+        auto line_info = lexer.grab().line_info;
+
+        lexer.advance();
+        auto rhs = parse_expr();
+
+        auto stmt = ast.alloc<Ast::Stmt>();
+        *stmt = Ast::Stmt{
+          .line_info = line_info,
+          .tag = Ast::Stmt::_Assign,
+          .as = { .Assign = {
+              .lhs = base,
+              .rhs = rhs,
+            } },
+        };
+
+        must_end_with_semicolon = true;
+
+        return stmt;
+      }
+      default:
+      {
+        auto stmt = ast.alloc<Ast::Stmt>();
+        *stmt = Ast::Stmt{
+          .line_info = base->line_info,
+          .tag = Ast::Stmt::_Expr,
+          .as = { .Expr = base },
+        };
+
+        must_end_with_semicolon = true;
+
+        return stmt;
+      }
+      }
+    };
+
+    auto stmt = go();
+
+    if (must_end_with_semicolon)
+    {
+      if (lexer.peek() == Token::_Semicolon)
+        lexer.advance();
+      else
+        report_error(lexer.grab().line_info, "expected ';'");
+    }
+
+    return stmt;
+  }
+
+  void insert_symbol(Ast::Expr *expr)
+  {
+    switch (expr->tag)
+    {
+    case Ast::Expr::_Binary_Op:
+    {
+      auto &Binary_Op = expr->as.Binary_Op;
+
+      insert_symbol(Binary_Op.lhs);
+      insert_symbol(Binary_Op.rhs);
+    } break;
+    case Ast::Expr::_Unary_Op:
+    {
+      auto &Unary_Op = expr->as.Unary_Op;
+
+      insert_symbol(Unary_Op.subexpr);
+    } break;
+    case Ast::Expr::_Cast:
+    {
+      insert_symbol(expr->as.Cast.expr);
+    } break;
+    case Ast::Expr::_Type:
+    {
+      auto &Type = expr->as.Type;
+      switch (Type.tag)
+      {
+      case Ast::Type::_Bool:
+      case Ast::Type::_Int:
+        break;
+      }
+    } break;
+    case Ast::Expr::_Boolean:
+    case Ast::Expr::_Integer:
+      break;
+    case Ast::Expr::_Symbol:
+      UNREACHABLE();
+    case Ast::Expr::_Identifier:
+    {
+      auto &Identifier = expr->as.Identifier;
+
+      auto [it, was_inserted] = ast.symbol_table.insert(Ast::SymbolKey{
+          .name = Identifier,
+        });
+
+      if (!was_inserted)
+      {
+        report_error(expr->line_info, std::format("symbol '{}' is defined already", Identifier));
+        COMPILER_EXIT_ERROR();
+      }
+
+      auto symbol = ast.alloc<Ast::Symbol>();
+      *symbol = Ast::Symbol{
+        .name = it->first.name,
+        .line_info = expr->line_info,
+        .tag = Ast::Symbol::_Identifier,
+        .as = { .Identifier = {
+            .type = nullptr,
+            .value = nullptr,
+          } },
+      };
+      it->second = symbol;
+
+      expr->tag = Ast::Expr::_Symbol;
+      expr->as.Symbol = symbol;
+    }
+    }
+  }
+
   void parse()
   {
-    auto expr_list = Ast::ExprList{ };
+    auto stmt_list = Ast::StmtList{ };
 
     while (lexer.peek() != Token::_End_Of_File)
     {
-      auto expr = parse_expr();
+      auto stmt = parse_stmt();
 
-      auto node = ast.alloc<Ast::ExprList::Node>();
-      *node = Ast::ExprList::Node{
-        .data = expr,
+      auto node = ast.alloc<Ast::StmtList::Node>();
+      *node = Ast::StmtList::Node{
+        .data = stmt,
       };
-      expr_list.insert_last(node);
+      stmt_list.insert_last(node);
     }
 
-    ast.exprs = expr_list;
+    ast.stmt_list = stmt_list;
   }
 
   void report_error(LineInfo line_info, std::string_view text)

@@ -9,6 +9,20 @@ namespace Utils
     return value;
   }
 
+  constexpr u8 log2(u64 value)
+  {
+    u8 result = 0;
+
+    for (u8 i = 6; i-- > 0; )
+    {
+      auto bits = (bool)(value >> (1u << i)) << i;
+      result += bits;
+      value >>= bits;
+    }
+
+    return result;
+  }
+
   constexpr bool is_prefix(std::string_view prefix, std::string_view string)
   {
     return prefix.size() <= string.size() && memcmp(&prefix[0], &string[0], prefix.size()) == 0;
