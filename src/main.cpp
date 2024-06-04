@@ -33,7 +33,7 @@ using i64 = int64_t;
 
 int main(int argc, char **argv)
 {
-  auto ast = Parser::parse(argc < 2 ? "tests/debug" : argv[1]);
+  auto ast = Parser::parse(argc < 2 ? "tests/debug.test" : argv[1]);
   Typechecker::typecheck(ast);
   Transpiler::transpile(ast);
 }
