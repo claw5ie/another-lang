@@ -52,7 +52,7 @@ namespace Utils
     return file_data;
 
   exit_error:
-    perror(strerror(errno));
+    std::cerr << "error: \"" << filepath << "\": " << strerror(errno) << "\n";
     exit(EXIT_FAILURE);
   }
 }

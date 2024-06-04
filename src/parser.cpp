@@ -7,21 +7,19 @@ struct Parser
 
   static Ast parse(const char *filepath)
   {
-    auto lexer = Lexer::init(filepath);
     auto parser = Parser{
-      .lexer = lexer,
+      .lexer = Lexer::init(filepath),
       .ast = {
         .stmt_list = { },
         .symbol_table = { },
         .arena = { },
-        .filepath = lexer.filepath,
-        .source_code = { },
+        .filepath = filepath,
       },
       .had_error = false,
     };
     parser.parse();
 
-    parser.ast.source_code = std::move(parser.lexer.source_code);
+    parser.ast.symbol_table.string_pool.swap(parser.lexer.string_pool);
 
     return std::move(parser.ast);
   }

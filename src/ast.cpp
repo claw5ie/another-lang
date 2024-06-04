@@ -6,6 +6,7 @@ struct Ast
 
   using ArenaAllocator = NotStd::ArenaAllocator;
   using LineInfo = Lexer::LineInfo;
+  using StringPool = Lexer::StringPool;
   using SymbolList = NotStd::LinkedList<Symbol *>;
   using ExprList = NotStd::LinkedList<Expr *>;
   using StmtList = NotStd::LinkedList<Stmt *>;
@@ -219,7 +220,6 @@ struct Ast
     };
 
     using Map = std::unordered_map<SymbolKey, Symbol *, Hash, Equal>;
-    using StringList = std::forward_list<std::string>;
 
     std::pair<Map::iterator, bool> insert(SymbolKey key)
     {
@@ -228,15 +228,15 @@ struct Ast
         return { it, false };
       else
       {
-        strings.push_front(std::string{ key.name });
-        auto [it, was_inserted] = map.emplace(SymbolKey{ .name = strings.front() }, nullptr);
+        auto [string_it, _] = string_pool.emplace(key.name);
+        auto [it, was_inserted] = map.emplace(SymbolKey{ .name = *string_it }, nullptr);
         assert(was_inserted);
         return { it, true };
       }
     }
 
     Map map;
-    StringList strings;
+    StringPool string_pool;
   };
 
   template <typename T>
@@ -253,5 +253,4 @@ struct Ast
   ArenaAllocator arena;
 
   std::string_view filepath;
-  std::string source_code;
 };

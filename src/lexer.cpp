@@ -1,13 +1,11 @@
-#ifdef NDEBUG
 #define COMPILER_EXIT_ERROR() exit(EXIT_FAILURE)
-#else
-#define COMPILER_EXIT_ERROR() assert(false)
-#endif
 
 #define REPORT_ERROR_HELPER(filepath, line_info, header, text) std::cerr << filepath << ":" << (line_info).line << ":" << (line_info).column << ": " header ": " << text << "\n"
 
 struct Lexer
 {
+  using StringPool = std::unordered_set<std::string>;
+
   struct LineInfo
   {
     u32 line, column;
@@ -202,7 +200,7 @@ struct Lexer
       while (isdigit(text[i]));
 
       token.tag = Token::_Integer;
-      token.as = { .Integer = value };
+      token.as = Token::Data{ .Integer = value };
     }
     else if (isalpha(text[i]) || text[i] == '_')
     {
@@ -236,7 +234,7 @@ struct Lexer
           assert(ec == std::errc{ });
 
           token.tag = Token::_Int_Type;
-          token.as = { .Int_Type = {
+          token.as = Token::Data{ .Int_Type = {
               .bits = bits,
               .is_signed = is_signed,
             } };
@@ -244,9 +242,6 @@ struct Lexer
           goto push_token;
         }
       }
-
-      token.tag = Token::_Identifier;
-      token.as = { .Identifier = identifier };
 
       struct Keyword
       {
@@ -265,9 +260,13 @@ struct Lexer
         if (keyword.text == identifier)
         {
           token.tag = keyword.tag;
-          break;
+          goto push_token;
         }
       }
+
+      auto [string_it, _] = string_pool.emplace(identifier);
+      token.tag = Token::_Identifier;
+      token.as = Token::Data{ .Identifier = *string_it };
     }
     else
     {
@@ -338,4 +337,5 @@ struct Lexer
 
   std::string_view filepath;
   std::string source_code;
+  StringPool string_pool = { };
 };
