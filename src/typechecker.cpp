@@ -345,7 +345,7 @@ struct Typechecker
       if (it == ast->symbol_table.map.end()
           || it->second->line_info.offset > expr->line_info.offset)
       {
-        report_error(expr->line_info, std::format("'{}' symbol is not defined", Identifier));
+        report_error(expr->line_info, std::format("symbol '{}' is not defined", Identifier));
         COMPILER_EXIT_ERROR();
       }
 

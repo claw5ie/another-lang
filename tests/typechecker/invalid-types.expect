@@ -1,0 +1,1 @@
+tests/typechecker/invalid-types.test:1:4: error: expected type, not expression

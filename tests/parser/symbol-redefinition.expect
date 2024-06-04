@@ -1,0 +1,1 @@
+tests/parser/symbol-redefinition.test:2:1: error: symbol 'a' is defined already

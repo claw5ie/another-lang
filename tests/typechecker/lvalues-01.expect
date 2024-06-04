@@ -1,0 +1,1 @@
+tests/typechecker/lvalues-01.test:2:1: error: expression is not a lvalue
