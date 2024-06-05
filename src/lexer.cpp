@@ -37,6 +37,7 @@ struct Lexer
       _Percent_Sign,
 
       _Exclamation_Mark,
+      _Ampersand,
 
       _Open_Paren,
       _Close_Paren,
@@ -44,11 +45,14 @@ struct Lexer
       _Colon,
       _Equal,
 
+      _Void_Type,
       _Bool_Type,
       _Int_Type,
 
       _False,
       _True,
+
+      _Null,
 
       _Integer,
       _Identifier,
@@ -136,15 +140,18 @@ struct Lexer
       case Token::_Slash:            return "'/'";
       case Token::_Percent_Sign:     return "'%'";
       case Token::_Exclamation_Mark: return "'!'";
+      case Token::_Ampersand:        return "'&'";
       case Token::_Open_Paren:       return "'('";
       case Token::_Close_Paren:      return "')'";
       case Token::_Semicolon:        return "';'";
       case Token::_Colon:            return "':'";
       case Token::_Equal:            return "'='";
+      case Token::_Void_Type:        return "'void'";
       case Token::_Bool_Type:        return "'bool'";
       case Token::_Int_Type:         return "integer type";
       case Token::_False:            return "'false'";
       case Token::_True:             return "'true'";
+      case Token::_Null:             return "'null'";
       case Token::_Integer:          return "integer literal";
       case Token::_Identifier:       return "identifier";
       case Token::_End_Of_File:      return "end-of-file";
@@ -252,7 +259,9 @@ struct Lexer
       static constexpr Keyword keywords[] = {
         { .text = "false", .tag = Token::_False, },
         { .text = "true", .tag = Token::_True, },
+        { .text = "void", .tag = Token::_Void_Type, },
         { .text = "bool", .tag = Token::_Bool_Type, },
+        { .text = "null", .tag = Token::_Null, },
       };
 
       for (auto &keyword: keywords)
@@ -291,6 +300,7 @@ struct Lexer
         { .text = "/", .tag = Token::_Slash, },
         { .text = "%", .tag = Token::_Percent_Sign, },
         { .text = "!", .tag = Token::_Exclamation_Mark, },
+        { .text = "&", .tag = Token::_Ampersand, },
         { .text = "(", .tag = Token::_Open_Paren, },
         { .text = ")", .tag = Token::_Close_Paren, },
         { .text = ";", .tag = Token::_Semicolon, },

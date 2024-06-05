@@ -2,6 +2,8 @@ struct Typechecker
 {
   using LineInfo = Lexer::LineInfo;
 
+  static Ast::Expr void_pointer_type;
+  static Ast::Expr void_type;
   static Ast::Expr bool_type;
 
   static constexpr u16 MAX_BITS_IN_INTEGER = 64;
@@ -15,53 +17,94 @@ struct Typechecker
     typechecker.typecheck();
   }
 
-  bool is_same_type(Ast::Expr *lhs, Ast::Expr *lhs_type, Ast::Expr *rhs, Ast::Expr *rhs_type)
+  static bool is_same_type(Ast::Expr *lhs_type, Ast::Expr *rhs_type)
   {
-    assert((!lhs || lhs->tag != Ast::Expr::_Type)
-           && lhs_type->tag == Ast::Expr::_Type
-           && (!rhs || rhs->tag != Ast::Expr::_Type)
+    assert(lhs_type->tag == Ast::Expr::_Type
            && rhs_type->tag == Ast::Expr::_Type);
 
-    switch (lhs_type->as.Type.tag)
+    auto &Lhs_Type = lhs_type->as.Type;
+    auto &Rhs_Type = rhs_type->as.Type;
+
+    switch (Lhs_Type.tag)
     {
+    case Ast::Type::_Pointer:
+    {
+      if (Rhs_Type.tag != Ast::Type::_Pointer)
+        return false;
+      else
+        return is_same_type(Lhs_Type.as.Pointer, Rhs_Type.as.Pointer);
+    }
+    case Ast::Type::_Void:
     case Ast::Type::_Bool:
-      return lhs_type->as.Type.tag == rhs_type->as.Type.tag;
+      return Lhs_Type.tag == Rhs_Type.tag;
     case Ast::Type::_Int:
-      return maybe_safe_cast_int_types(lhs, lhs_type, rhs, rhs_type);
+    {
+      if (Rhs_Type.tag != Ast::Type::_Int)
+        return false;
+
+      auto &Lhs_Int = Lhs_Type.as.Int;
+      auto &Rhs_Int = Rhs_Type.as.Int;
+
+      return Lhs_Int.bits == Rhs_Int.bits && Lhs_Int.is_signed == Rhs_Int.is_signed;
+    }
     }
 
     UNREACHABLE();
   }
 
-  // This functions shouldn't exist. Every time we check if two types are the same, we should perform type conversions, if necessary, but sometimes those can't happen (like when checking boolean expressions).
-  bool is_same_type(Ast::Expr *lhs_type, Ast::Expr *rhs_type)
-  {
-    return is_same_type(nullptr, lhs_type, nullptr, rhs_type);
-  }
-
-  Ast::Expr *maybe_safe_cast_int_types(Ast::Expr *lhs, Ast::Expr *lhs_type, Ast::Expr *rhs, Ast::Expr *rhs_type)
+  Ast::Expr *try_implicit_safe_cast(Ast::Expr *lhs_type, Ast::Expr *rhs_type, Ast::Expr *lhs, Ast::Expr *rhs)
   {
     assert(lhs_type->tag == Ast::Expr::_Type
            && rhs_type->tag == Ast::Expr::_Type);
 
-    Ast::Expr *type = nullptr;
-    auto should_cast_lhs = false;
-    auto should_cast_rhs = false;
     auto &Lhs_Type = lhs_type->as.Type;
     auto &Rhs_Type = rhs_type->as.Type;
 
-    if (Lhs_Type.tag != Ast::Type::_Int || Rhs_Type.tag != Ast::Type::_Int)
+    switch (Lhs_Type.tag)
     {
-      return nullptr;
+    case Ast::Type::_Pointer:
+    {
+      if (Rhs_Type.tag != Ast::Type::_Pointer)
+        return nullptr;
+      else if (is_same_type(Lhs_Type.as.Pointer, &void_type))
+        return &void_type;
+      else if (is_same_type(Rhs_Type.as.Pointer, &void_type))
+        return &void_type;
+      else
+        return is_same_type(Lhs_Type.as.Pointer, Rhs_Type.as.Pointer) ? lhs_type : nullptr;
     }
-    else if (Lhs_Type.as.Int.is_signed == Rhs_Type.as.Int.is_signed)
+    case Ast::Type::_Void:
+    case Ast::Type::_Bool:
+      return Lhs_Type.tag == Rhs_Type.tag ? lhs_type : nullptr;
+    case Ast::Type::_Int:
+      return try_safe_cast_ints(lhs_type, rhs_type, lhs, rhs);
+    }
+
+    UNREACHABLE();
+  }
+
+  Ast::Expr *try_safe_cast_ints(Ast::Expr *lhs_type, Ast::Expr *rhs_type, Ast::Expr *lhs, Ast::Expr *rhs)
+  {
+    assert(lhs_type->tag == Ast::Expr::_Type
+           && rhs_type->tag == Ast::Expr::_Type);
+
+    if (lhs_type->as.Type.tag != Ast::Type::_Int || rhs_type->as.Type.tag != Ast::Type::_Int)
+      return nullptr;
+
+    Ast::Expr *type = nullptr;
+    auto should_cast_lhs = false;
+    auto should_cast_rhs = false;
+    auto &Lhs_Int = lhs_type->as.Type.as.Int;
+    auto &Rhs_Int = rhs_type->as.Type.as.Int;
+
+    if (Lhs_Int.is_signed == Rhs_Int.is_signed)
     {
-      if (Lhs_Type.as.Int.bits < Rhs_Type.as.Int.bits)
+      if (Lhs_Int.bits < Rhs_Int.bits)
       {
         should_cast_lhs = true;
         type = rhs_type;
       }
-      else if (Lhs_Type.as.Int.bits > Rhs_Type.as.Int.bits)
+      else if (Lhs_Int.bits > Rhs_Int.bits)
       {
         should_cast_rhs = true;
         type = lhs_type;
@@ -71,9 +114,9 @@ struct Typechecker
         type = lhs_type;
       }
     }
-    else if (Lhs_Type.as.Int.is_signed)
+    else if (Lhs_Int.is_signed)
     {
-      if (Rhs_Type.as.Int.bits < Lhs_Type.as.Int.bits)
+      if (Rhs_Int.bits < Lhs_Int.bits)
       {
         should_cast_rhs = true;
         type = lhs_type;
@@ -81,7 +124,7 @@ struct Typechecker
     }
     else
     {
-      if (Lhs_Type.as.Int.bits < Rhs_Type.as.Int.bits)
+      if (Lhs_Int.bits < Rhs_Int.bits)
       {
         should_cast_lhs = true;
         type = rhs_type;
@@ -123,7 +166,7 @@ struct Typechecker
     return type;
   }
 
-  Ast::Expr *maybe_safe_cast_negate_int(Ast::Expr *expr, Ast::Expr *type)
+  Ast::Expr *try_safe_negate_int(Ast::Expr *expr, Ast::Expr *type)
   {
     assert(type->tag == Ast::Expr::_Type);
 
@@ -162,8 +205,36 @@ struct Typechecker
     return nullptr;
   }
 
+  void try_fix_expr_that_is_type(Ast::Expr *maybe_type)
+  {
+    switch (maybe_type->tag)
+    {
+    case Ast::Expr::_Deref:
+    {
+      auto subexpr = maybe_type->as.Deref;
+
+      try_fix_expr_that_is_type(subexpr);
+
+      if (subexpr->tag == Ast::Expr::_Type)
+      {
+        maybe_type->tag = Ast::Expr::_Type;
+        maybe_type->as.Type = Ast::Type{
+          .tag = Ast::Type::_Pointer,
+          .as = { .Pointer = subexpr },
+        };
+      }
+    } break;
+    case Ast::Expr::_Identifier:
+      break;
+    default:
+      break;
+    }
+  }
+
   void typecheck_type(Ast::Expr *type)
   {
+    try_fix_expr_that_is_type(type);
+
     switch (type->tag)
     {
     case Ast::Expr::_Type:
@@ -172,6 +243,11 @@ struct Typechecker
 
       switch (Type.tag)
       {
+      case Ast::Type::_Pointer:
+      {
+        typecheck_type(Type.as.Pointer);
+      } break;
+      case Ast::Type::_Void:
       case Ast::Type::_Bool:
         break;
       case Ast::Type::_Int:
@@ -185,9 +261,12 @@ struct Typechecker
     } break;
     case Ast::Expr::_Binary_Op:
     case Ast::Expr::_Unary_Op:
+    case Ast::Expr::_Ref:
+    case Ast::Expr::_Deref:
     case Ast::Expr::_Cast:
     case Ast::Expr::_Boolean:
     case Ast::Expr::_Integer:
+    case Ast::Expr::_Null:
     case Ast::Expr::_Symbol:
       report_error(type->line_info, "expected type, not expression");
       COMPILER_EXIT_ERROR();
@@ -201,6 +280,8 @@ struct Typechecker
 
   Ast::Expr *typecheck_expr(Ast::Expr *expr)
   {
+    try_fix_expr_that_is_type(expr);
+
     switch (expr->tag)
     {
     case Ast::Expr::_Binary_Op:
@@ -225,7 +306,7 @@ struct Typechecker
       case Ast::Expr::BinaryOp::Eq:
       case Ast::Expr::BinaryOp::Neq:
       {
-        if (!is_same_type(Binary_Op.lhs, lhs_type, Binary_Op.rhs, rhs_type))
+        if (!try_implicit_safe_cast(lhs_type, rhs_type, Binary_Op.lhs, Binary_Op.rhs))
         {
           report_error(Binary_Op.line_info, std::format("can't compare values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
         }
@@ -237,7 +318,7 @@ struct Typechecker
       case Ast::Expr::BinaryOp::Gt:
       case Ast::Expr::BinaryOp::Geq:
       {
-        if (!maybe_safe_cast_int_types(Binary_Op.lhs, lhs_type, Binary_Op.rhs, rhs_type))
+        if (!try_safe_cast_ints(lhs_type, rhs_type, Binary_Op.lhs, Binary_Op.rhs))
         {
           report_error(Binary_Op.line_info, std::format("can't compare values of types '{}'/'{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
         }
@@ -250,7 +331,7 @@ struct Typechecker
       case Ast::Expr::BinaryOp::Div:
       case Ast::Expr::BinaryOp::Mod:
       {
-        auto result = maybe_safe_cast_int_types(Binary_Op.lhs, lhs_type, Binary_Op.rhs, rhs_type);
+        auto result = try_safe_cast_ints(lhs_type, rhs_type, Binary_Op.lhs, Binary_Op.rhs);
 
         if (!result)
         {
@@ -293,7 +374,7 @@ struct Typechecker
       }
       case Ast::Expr::UnaryOp::Minus:
       {
-        auto result = maybe_safe_cast_negate_int(Unary_Op.subexpr, subexpr_type);
+        auto result = try_safe_negate_int(Unary_Op.subexpr, subexpr_type);
 
         if (!result)
         {
@@ -307,9 +388,54 @@ struct Typechecker
 
       UNREACHABLE();
     }
+    case Ast::Expr::_Ref:
+    {
+      auto subexpr = expr->as.Ref;
+      auto subexpr_type = typecheck_expr(subexpr);
+
+      if (!(subexpr->flags & Ast::Expr::IS_LVALUE))
+      {
+        report_error(expr->line_info, "expression is not an lvalue");
+      }
+
+      auto result = ast->alloc<Ast::Expr>();
+      *result = Ast::Expr{
+        .line_info = expr->line_info,
+        .tag = Ast::Expr::_Type,
+        .as = { .Type = {
+            .tag = Ast::Type::_Pointer,
+            .as = { .Pointer = subexpr_type },
+          } },
+        .flags = 0,
+      };
+
+      return result;
+    }
+    case Ast::Expr::_Deref:
+    {
+      auto subexpr = expr->as.Deref;
+      auto subexpr_type = typecheck_expr(subexpr);
+
+      if (is_same_type(subexpr_type, &void_pointer_type))
+      {
+        report_error(expr->line_info, "can't dereference pointer to 'void'");
+        COMPILER_EXIT_ERROR();
+      }
+      else if (subexpr_type->as.Type.tag != Ast::Type::_Pointer)
+      {
+        report_error(expr->line_info, "can't dereference non-pointer expressions");
+        COMPILER_EXIT_ERROR();
+      }
+
+      expr->flags |= Ast::Expr::IS_LVALUE;
+
+      return subexpr_type->as.Type.as.Pointer;
+    }
     case Ast::Expr::_Cast:
-    case Ast::Expr::_Type:
       UNREACHABLE();
+    case Ast::Expr::_Type:
+      report_error(expr->line_info, "unexpected type");
+      COMPILER_EXIT_ERROR();
     case Ast::Expr::_Boolean:
       return &bool_type;
     case Ast::Expr::_Integer:
@@ -334,6 +460,8 @@ struct Typechecker
 
       return type;
     }
+    case Ast::Expr::_Null:
+      return &void_pointer_type;
     case Ast::Expr::_Identifier:
     {
       auto &Identifier = expr->as.Identifier;
@@ -390,6 +518,14 @@ struct Typechecker
     case Ast::Expr::_Unary_Op:
       report_error(pattern->line_info, "can't pattern match unary operators");
       break;
+    case Ast::Expr::_Ref:
+      // Can pattern match when structures are introduced.
+      report_error(pattern->line_info, "can't pattern match '&' operators");
+      break;
+    case Ast::Expr::_Deref:
+      // Can pattern match if is a type.
+      report_error(pattern->line_info, "can't pattern match '*' operators");
+      break;
     case Ast::Expr::_Cast:
       report_error(pattern->line_info, "can't pattern match cast expression");
       break;
@@ -408,6 +544,14 @@ struct Typechecker
       if (type->as.Type.tag != Ast::Type::_Int)
       {
         report_error(type->line_info, std::format("expected integer type, but got '{}'", type->type_to_string()));
+      }
+    } break;
+    case Ast::Expr::_Null:
+    {
+      // Should we implicitly cast here? Can values in patterns be implicitly casted?
+      if (!is_same_type(type, &void_pointer_type))
+      {
+        report_error(type->line_info, std::format("expected 'void*', but got '{}'", type->type_to_string()));
       }
     } break;
     case Ast::Expr::_Symbol:
@@ -439,7 +583,7 @@ struct Typechecker
       {
         auto value_type = typecheck_expr(Variable.value);
 
-        if (!is_same_type(nullptr, Variable.type, Variable.value, value_type))
+        if (!try_implicit_safe_cast(Variable.type, value_type, nullptr, Variable.value))
         {
           report_error(Variable.value->line_info, std::format("expected '{}', but got '{}'", Variable.type->type_to_string(), value_type->type_to_string()));
         }
@@ -467,7 +611,7 @@ struct Typechecker
 
       auto rhs_type = typecheck_expr(Assign.rhs);
 
-      if (!is_same_type(nullptr, lhs_type, Assign.rhs, rhs_type))
+      if (!try_implicit_safe_cast(lhs_type, rhs_type, nullptr, Assign.rhs))
       {
         report_error(Assign.rhs->line_info, std::format("expected '{}', but got '{}'", lhs_type->type_to_string(), rhs_type->type_to_string()));
       }
@@ -498,6 +642,26 @@ struct Typechecker
 
   Ast *ast;
   bool had_error;
+};
+
+Ast::Expr Typechecker::void_pointer_type = {
+  .line_info = { },
+  .tag = Ast::Expr::_Type,
+  .as = { .Type = {
+      .tag = Ast::Type::_Pointer,
+      .as = { .Pointer = &Typechecker::void_type },
+    } },
+  .flags = 0,
+};
+
+Ast::Expr Typechecker::void_type = {
+  .line_info = { },
+  .tag = Ast::Expr::_Type,
+  .as = { .Type = {
+      .tag = Ast::Type::_Void,
+      .as = { },
+    } },
+  .flags = 0,
 };
 
 Ast::Expr Typechecker::bool_type = {

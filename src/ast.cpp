@@ -56,12 +56,15 @@ struct Ast
 
     enum Tag
     {
+      _Pointer,
+      _Void,
       _Bool,
       _Int,
     };
 
     union Data
     {
+      Ast::Expr *Pointer;
       Type::Int Int;
     };
 
@@ -117,10 +120,13 @@ struct Ast
     {
       _Binary_Op,
       _Unary_Op,
+      _Ref,
+      _Deref,
       _Cast,
       _Type,
       _Boolean,
       _Integer,
+      _Null,
       _Symbol,
       _Identifier,
     };
@@ -129,6 +135,8 @@ struct Ast
     {
       Expr::BinaryOp Binary_Op;
       Expr::UnaryOp Unary_Op;
+      Ast::Expr *Ref;
+      Ast::Expr *Deref;
       Expr::Cast Cast;
       Ast::Type Type;
       bool Boolean;
@@ -143,11 +151,22 @@ struct Ast
 
     std::string type_to_string()
     {
-      static constexpr auto go = [](Ast::Expr *expr, std::string &dst)
+      std::function<void(std::string &, Ast::Expr *)> go;
+
+      go = [&go](std::string &dst, Ast::Expr *expr) -> void
       {
         assert(expr->tag == Ast::Expr::_Type);
         switch (expr->as.Type.tag)
         {
+        case Type::_Pointer:
+        {
+          go(dst, expr->as.Type.as.Pointer);
+          dst += "*";
+        } break;
+        case Type::_Void:
+        {
+          dst += "void";
+        } break;
         case Type::_Bool:
         {
           dst += "bool";
@@ -163,7 +182,7 @@ struct Ast
 
       auto result = std::string{ };
       result.reserve(64);
-      go(this, result);
+      go(result, this);
       return result;
     }
 

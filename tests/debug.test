@@ -19,3 +19,10 @@ c: bool = 2 < a && a >= 4;
 2 >= 2;
 2: i32 = 2;
 d: i2 = 1;
+
+e: void* = null;
+f: i2* = null;
+g: i2** = &f;
+// i2* = 42;
+g* = null;
+null: void * = null;

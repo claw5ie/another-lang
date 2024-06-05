@@ -31,6 +31,14 @@ struct Transpiler
 
     switch (Type.tag)
     {
+    case Ast::Type::_Pointer:
+    {
+      transpile_type(type->as.Type.as.Pointer);
+      std::cout << "*";
+    } break;
+    case Ast::Type::_Void:
+      std::cout << "void";
+      break;
     case Ast::Type::_Bool:
       std::cout << "bool";
       break;
@@ -86,6 +94,18 @@ struct Transpiler
       transpile_expr(Unary_Op.subexpr);
       std::cout << ")";
     } break;
+    case Ast::Expr::_Ref:
+    {
+      std::cout << "(&";
+      transpile_expr(expr->as.Ref);
+      std::cout << ")";
+    } break;
+    case Ast::Expr::_Deref:
+    {
+      std::cout << "(*";
+      transpile_expr(expr->as.Deref);
+      std::cout << ")";
+    } break;
     case Ast::Expr::_Cast:
     {
       auto &Cast = expr->as.Cast;
@@ -97,21 +117,7 @@ struct Transpiler
     } break;
     case Ast::Expr::_Type:
     {
-      auto &Type = expr->as.Type;
-
-      switch (Type.tag)
-      {
-      case Ast::Type::_Bool:
-      {
-        std::cout << "bool";
-      } break;
-      case Ast::Type::_Int:
-      {
-        auto &Int = Type.as.Int;
-
-        std::cout << (Int.is_signed ? "i" : "u") << Int.bits;
-      } break;
-      }
+      transpile_type(expr);
     } break;
     case Ast::Expr::_Boolean:
     {
@@ -120,6 +126,10 @@ struct Transpiler
     case Ast::Expr::_Integer:
     {
       std::cout << expr->as.Integer;
+    } break;
+    case Ast::Expr::_Null:
+    {
+      std::cout << "NULL";
     } break;
     case Ast::Expr::_Symbol:
     {
@@ -148,9 +158,16 @@ struct Transpiler
       transpile_expr(value);
       std::cout << ");\n";
     } break;
+    case Ast::Expr::_Null:
+    {
+      std::cout << "assert(NULL == ";
+      transpile_expr(value);
+      std::cout << ");\n";
+    } break;
     case Ast::Expr::_Symbol:
     {
       auto Symbol = pattern->as.Symbol;
+
       assert(Symbol->tag == Ast::Symbol::_Identifier);
       auto &Identifier = Symbol->as.Identifier;
       Identifier.value = value;
@@ -158,6 +175,8 @@ struct Transpiler
     } break;
     case Ast::Expr::_Binary_Op:
     case Ast::Expr::_Unary_Op:
+    case Ast::Expr::_Ref:
+    case Ast::Expr::_Deref:
     case Ast::Expr::_Cast:
     case Ast::Expr::_Type:
     case Ast::Expr::_Identifier:

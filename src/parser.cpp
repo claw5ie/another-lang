@@ -77,6 +77,29 @@ struct Parser
     }
   }
 
+  static bool can_token_start_expression(Token::Tag tag)
+  {
+    switch (tag)
+    {
+    case Token::_Double_Ampersand:
+    case Token::_Plus:
+    case Token::_Minus:
+    case Token::_Exclamation_Mark:
+    case Token::_Ampersand:
+    case Token::_Open_Paren:
+    case Token::_Void_Type:
+    case Token::_Bool_Type:
+    case Token::_Int_Type:
+    case Token::_False:
+    case Token::_True:
+    case Token::_Null:
+    case Token::_Integer:
+    case Token::_Identifier: return true;
+    default:                 return false;
+    }
+  }
+
+  // Every case should also appear in 'can_token_start_expression'.
   Ast::Expr *parse_expr_highest_prec()
   {
     auto token = lexer.grab();
@@ -84,6 +107,29 @@ struct Parser
 
     switch (token.tag)
     {
+    case Token::_Double_Ampersand:
+    {
+      auto subsubexpr = parse_expr_highest_prec();
+      auto subexpr = ast.alloc<Ast::Expr>();
+      *subexpr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Ref,
+        .as = { .Ref = subsubexpr },
+        .flags = 0,
+      };
+      ++subexpr->line_info.column;
+      ++subexpr->line_info.offset;
+
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Ref,
+        .as = { .Ref = subexpr },
+        .flags = 0,
+      };
+
+      return expr;
+    }
     case Token::_Plus:
     case Token::_Minus:
     case Token::_Exclamation_Mark:
@@ -102,10 +148,36 @@ struct Parser
 
       return expr;
     }
+    case Token::_Ampersand:
+    {
+      auto subexpr = parse_expr_highest_prec();
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Ref,
+        .as = { .Ref = subexpr },
+        .flags = 0,
+      };
+      return expr;
+    }
     case Token::_Open_Paren:
     {
       auto expr = parse_expr();
       lexer.expect(Token::_Close_Paren);
+      return expr;
+    }
+    case Token::_Void_Type:
+    {
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Type,
+        .as = { .Type = {
+            .tag = Ast::Type::_Void,
+            .as = { },
+          } },
+        .flags = 0,
+      };
       return expr;
     }
     case Token::_Bool_Type:
@@ -153,6 +225,17 @@ struct Parser
       };
       return expr;
     }
+    case Token::_Null:
+    {
+      auto expr = ast.alloc<Ast::Expr>();
+      *expr = Ast::Expr{
+        .line_info = token.line_info,
+        .tag = Ast::Expr::_Null,
+        .as = { },
+        .flags = 0,
+      };
+      return expr;
+    }
     case Token::_Integer:
     {
       auto expr = ast.alloc<Ast::Expr>();
@@ -177,14 +260,49 @@ struct Parser
       return expr;
     }
     default:
+      assert(!can_token_start_expression(token.tag));
       report_error(token.line_info, "token doesn't start an expression");
       COMPILER_EXIT_ERROR();
     }
   }
 
+  Ast::Expr *parse_expr_base()
+  {
+    auto base = parse_expr_highest_prec();
+
+    do
+    {
+      switch (lexer.peek())
+      {
+      case Token::_Asterisk:
+      {
+        if (can_token_start_expression(lexer.peek(1)))
+          goto finish_parsing_unary_operators;
+
+        lexer.advance();
+        auto new_base = ast.alloc<Ast::Expr>();
+        *new_base = Ast::Expr{
+          .line_info = base->line_info,
+          .tag = Ast::Expr::_Deref,
+          .as = { .Deref = base },
+          .flags = 0,
+        };
+        base = new_base;
+
+      } break;
+      default:
+        goto finish_parsing_unary_operators;
+      }
+    }
+    while (true);
+  finish_parsing_unary_operators:
+
+    return base;
+  }
+
   Ast::Expr *parse_expr_prec(int lowest_prec_limit)
   {
-    auto lhs = parse_expr_highest_prec();
+    auto lhs = parse_expr_base();
     auto op = lexer.peek();
     auto prev_prec = std::numeric_limits<int>::max(), curr_prec = prec(op);
 
@@ -342,6 +460,14 @@ struct Parser
 
       insert_symbol(Unary_Op.subexpr);
     } break;
+    case Ast::Expr::_Ref:
+    {
+      insert_symbol(expr->as.Ref);
+    } break;
+    case Ast::Expr::_Deref:
+    {
+      insert_symbol(expr->as.Deref);
+    } break;
     case Ast::Expr::_Cast:
     {
       insert_symbol(expr->as.Cast.expr);
@@ -351,6 +477,8 @@ struct Parser
       auto &Type = expr->as.Type;
       switch (Type.tag)
       {
+      case Ast::Type::_Pointer:
+      case Ast::Type::_Void:
       case Ast::Type::_Bool:
       case Ast::Type::_Int:
         break;
@@ -358,6 +486,7 @@ struct Parser
     } break;
     case Ast::Expr::_Boolean:
     case Ast::Expr::_Integer:
+    case Ast::Expr::_Null:
       break;
     case Ast::Expr::_Symbol:
       UNREACHABLE();
